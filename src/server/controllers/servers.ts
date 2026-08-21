@@ -1804,6 +1804,320 @@ export const installMod = async (req: Request, res: Response) => {
   }
 };
 
+export const installResourcePack = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const serversJSON = await readJSON("servers.json");
+  const server = serversJSON?.find((s: any) => s.id === id);
+  if (!server) return res.status(404).json({ error: "Server not found" });
+
+  const { projectId, title, setInProperties = true, versionId, downloadUrl: customUrl } = req.body;
+
+  if (!projectId && !customUrl) {
+    return res.status(400).json({ error: "Missing projectId or downloadUrl" });
+  }
+
+  try {
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    const rpDir = path.join(serverDir, "resourcepacks");
+    await fs.ensureDir(rpDir);
+
+    let downloadUrl = customUrl || null;
+    let filename = `${(title || projectId || "resource_pack").replace(/[^a-zA-Z0-9_\-]/g, '_')}.zip`;
+    let sha1Hash = "";
+    const axios = (await import("axios")).default;
+
+    if (!downloadUrl && projectId) {
+      const urlToFetch = versionId
+        ? `https://api.modrinth.com/v2/version/${versionId}`
+        : `https://api.modrinth.com/v2/project/${projectId}/version`;
+
+      const verRes = await axios.get(urlToFetch, {
+        headers: { 'User-Agent': 'React-Minecraft-Panel/1.0' },
+        timeout: 10000
+      });
+
+      const versions = Array.isArray(verRes.data) ? verRes.data : [verRes.data];
+      if (versions.length > 0) {
+        const file = versions[0].files?.find((f: any) => f.primary) || versions[0].files?.[0];
+        if (file) {
+          downloadUrl = file.url;
+          filename = file.filename || filename;
+          if (file.hashes?.sha1) {
+            sha1Hash = file.hashes.sha1;
+          }
+        }
+      }
+    }
+
+    if (!downloadUrl) {
+      return res.status(404).json({ error: "Could not find a valid download URL for this resource pack." });
+    }
+
+    const filePath = path.join(rpDir, filename);
+    const response = await axios({
+      url: downloadUrl,
+      method: 'GET',
+      responseType: 'stream',
+      headers: { 'User-Agent': 'React-Minecraft-Panel/1.0' },
+      timeout: 60000
+    });
+
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+
+    await new Promise<void>((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    await secureFilePermissions(filePath);
+
+    // Compute SHA1 if not provided
+    if (!sha1Hash && fs.existsSync(filePath)) {
+      const fileBuffer = await fs.readFile(filePath);
+      sha1Hash = crypto.createHash("sha1").update(fileBuffer).digest("hex");
+    }
+
+    // Update server.properties if requested
+    if (setInProperties) {
+      const propsPath = path.join(serverDir, "server.properties");
+      let props = fs.existsSync(propsPath) ? await fs.readFile(propsPath, "utf-8") : "";
+
+      const updateProp = (key: string, val: string) => {
+        const regex = new RegExp(`^${key}=.*$`, "m");
+        if (regex.test(props)) {
+          props = props.replace(regex, `${key}=${val}`);
+        } else {
+          props += `\n${key}=${val}\n`;
+        }
+      };
+
+      updateProp("resource-pack", downloadUrl);
+      if (sha1Hash) {
+        updateProp("resource-pack-sha1", sha1Hash);
+      }
+
+      await fs.writeFile(propsPath, props, "utf-8");
+    }
+
+    res.json({
+      success: true,
+      message: setInProperties
+        ? `${title || filename} installed and set in server.properties!`
+        : `${title || filename} downloaded to resourcepacks folder!`,
+      filename,
+      sha1: sha1Hash,
+      downloadUrl
+    });
+  } catch (error: any) {
+    console.error("Resource pack install error:", error.message);
+    res.status(500).json({ error: "Resource pack installation failed: " + error.message });
+  }
+};
+
+export const installDatapack = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const serversJSON = await readJSON("servers.json");
+  const server = serversJSON?.find((s: any) => s.id === id);
+  if (!server) return res.status(404).json({ error: "Server not found" });
+
+  const { projectId, title, versionId, downloadUrl: customUrl } = req.body;
+
+  if (!projectId && !customUrl) {
+    return res.status(400).json({ error: "Missing projectId or downloadUrl" });
+  }
+
+  try {
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    
+    // Get level-name
+    const propsPath = path.join(serverDir, "server.properties");
+    let levelName = "world";
+    if (fs.existsSync(propsPath)) {
+      const props = await fs.readFile(propsPath, "utf-8");
+      const match = props.match(/^level-name=(.*)$/m);
+      if (match && match[1].trim()) levelName = match[1].trim();
+    }
+
+    const dpDir = path.join(serverDir, levelName, "datapacks");
+    await fs.ensureDir(dpDir);
+
+    let downloadUrl = customUrl || null;
+    let filename = `${(title || projectId || "datapack").replace(/[^a-zA-Z0-9_\-]/g, '_')}.zip`;
+    const axios = (await import("axios")).default;
+
+    if (!downloadUrl && projectId) {
+      const urlToFetch = versionId
+        ? `https://api.modrinth.com/v2/version/${versionId}`
+        : `https://api.modrinth.com/v2/project/${projectId}/version`;
+
+      const verRes = await axios.get(urlToFetch, {
+        headers: { 'User-Agent': 'React-Minecraft-Panel/1.0' },
+        timeout: 10000
+      });
+
+      const versions = Array.isArray(verRes.data) ? verRes.data : [verRes.data];
+      if (versions.length > 0) {
+        const file = versions[0].files?.find((f: any) => f.primary) || versions[0].files?.[0];
+        if (file) {
+          downloadUrl = file.url;
+          filename = file.filename || filename;
+        }
+      }
+    }
+
+    if (!downloadUrl) {
+      return res.status(404).json({ error: "Could not find a valid download URL for this datapack." });
+    }
+
+    const filePath = path.join(dpDir, filename);
+    const response = await axios({
+      url: downloadUrl,
+      method: 'GET',
+      responseType: 'stream',
+      headers: { 'User-Agent': 'React-Minecraft-Panel/1.0' },
+      timeout: 60000
+    });
+
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+
+    await new Promise<void>((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    await secureFilePermissions(filePath);
+
+    res.json({
+      success: true,
+      message: `${title || filename} installed into ${levelName}/datapacks!`,
+      filename
+    });
+  } catch (error: any) {
+    console.error("Datapack installation failed:", error.message);
+    res.status(500).json({ error: "Datapack installation failed: " + error.message });
+  }
+};
+
+export const getInstalledPackages = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+
+    // Read level name
+    const propsPath = path.join(serverDir, "server.properties");
+    let levelName = "world";
+    let serverPropsRP = { url: "", sha1: "", required: false, prompt: "" };
+
+    if (fs.existsSync(propsPath)) {
+      const props = await fs.readFile(propsPath, "utf-8");
+      const lvlMatch = props.match(/^level-name=(.*)$/m);
+      if (lvlMatch && lvlMatch[1].trim()) levelName = lvlMatch[1].trim();
+
+      const rpUrl = props.match(/^resource-pack=(.*)$/m);
+      const rpSha1 = props.match(/^resource-pack-sha1=(.*)$/m);
+      const rpReq = props.match(/^require-resource-pack=(.*)$/m);
+      const rpPrompt = props.match(/^resource-pack-prompt=(.*)$/m);
+
+      serverPropsRP = {
+        url: rpUrl ? rpUrl[1].trim() : "",
+        sha1: rpSha1 ? rpSha1[1].trim() : "",
+        required: rpReq ? rpReq[1].trim().toLowerCase() === "true" : false,
+        prompt: rpPrompt ? rpPrompt[1].trim() : ""
+      };
+    }
+
+    const readDirSafely = async (dirPath: string) => {
+      if (!fs.existsSync(dirPath)) return [];
+      const entries = await fs.readdir(dirPath, { withFileTypes: true });
+      const items = [];
+      for (const e of entries) {
+        if (e.name.startsWith(".")) continue;
+        const full = path.join(dirPath, e.name);
+        try {
+          const st = await fs.stat(full);
+          items.push({
+            name: e.name.replace(/\.(jar|zip|disabled)$/i, ""),
+            filename: e.name,
+            isDirectory: e.isDirectory(),
+            size: st.size,
+            sizeMB: Number((st.size / (1024 * 1024)).toFixed(2)),
+            modified: st.mtime,
+            enabled: !e.name.endsWith(".disabled")
+          });
+        } catch {}
+      }
+      return items;
+    };
+
+    const [mods, plugins, resourcepacks, datapacks] = await Promise.all([
+      readDirSafely(path.join(serverDir, "mods")),
+      readDirSafely(path.join(serverDir, "plugins")),
+      readDirSafely(path.join(serverDir, "resourcepacks")),
+      readDirSafely(path.join(serverDir, levelName, "datapacks"))
+    ]);
+
+    res.json({
+      mods,
+      plugins,
+      resourcepacks,
+      datapacks,
+      serverPropertiesResourcePack: serverPropsRP
+    });
+  } catch (error: any) {
+    console.error("Failed to get installed packages:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const uninstallPackage = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { type, filename, clearServerProperties } = req.body;
+
+  try {
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+
+    if (type === "resourcepack" && clearServerProperties) {
+      const propsPath = path.join(serverDir, "server.properties");
+      if (fs.existsSync(propsPath)) {
+        let props = await fs.readFile(propsPath, "utf-8");
+        props = props.replace(/^resource-pack=.*$/m, "resource-pack=");
+        props = props.replace(/^resource-pack-sha1=.*$/m, "resource-pack-sha1=");
+        await fs.writeFile(propsPath, props, "utf-8");
+      }
+    }
+
+    if (filename) {
+      let targetDir = "";
+      if (type === "mod") targetDir = path.join(serverDir, "mods");
+      else if (type === "plugin") targetDir = path.join(serverDir, "plugins");
+      else if (type === "resourcepack") targetDir = path.join(serverDir, "resourcepacks");
+      else if (type === "datapack") {
+        const propsPath = path.join(serverDir, "server.properties");
+        let levelName = "world";
+        if (fs.existsSync(propsPath)) {
+          const props = await fs.readFile(propsPath, "utf-8");
+          const match = props.match(/^level-name=(.*)$/m);
+          if (match && match[1].trim()) levelName = match[1].trim();
+        }
+        targetDir = path.join(serverDir, levelName, "datapacks");
+      }
+
+      if (targetDir) {
+        const targetPath = path.join(targetDir, filename);
+        if (fs.existsSync(targetPath)) {
+          await fs.remove(targetPath);
+        }
+      }
+    }
+
+    res.json({ success: true, message: "Package removed successfully." });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const updateResources = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

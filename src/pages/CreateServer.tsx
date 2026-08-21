@@ -87,12 +87,13 @@ const pageStyles = `
 `;
 
 const RAM = [
-  {v:1,label:'Small Testing Server'},{v:2,label:'Small Testing Server'},{v:4,label:'Starter Survival'},
-  {v:8,label:'Medium Survival Server'},{v:16,label:'Large Community Server'},
-  {v:24,label:'Heavy Modpack Server'},{v:32,label:'High-Traffic Network'},
-  {v:48,label:'Enterprise Workload'},{v:64,label:'Extreme Performance'},
+  {v:1,label:'Small Testing'},{v:2,label:'Light Server'},{v:3,label:'Vanilla Small'},
+  {v:4,label:'Starter Survival'},{v:6,label:'Survival + Plugins'},{v:8,label:'Medium Community'},
+  {v:12,label:'High Modded'},{v:16,label:'Large Network'},
+  {v:24,label:'Heavy Modpack'},{v:32,label:'High-Traffic'},
+  {v:48,label:'Enterprise'},{v:64,label:'Extreme Performance'}
 ];
-const CPU_MAP: Record<number, number> = {1:100,2:100,4:150,8:200,16:300,24:400,32:500,48:700,64:800};
+const CPU_MAP: Record<number, number> = {1:100,2:100,3:120,4:150,6:180,8:200,12:250,16:300,24:400,32:500,48:700,64:800};
 
 const MINECRAFT_SOFTWARE = [
   {id:'paper',name:'Paper',desc:'High Performance',icon: Zap},
@@ -685,9 +686,29 @@ export default function CreateServer() {
                     <span className="flex-1 h-px bg-[#232323]"></span>
                   </div>
 
-                  <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-4">
-                    <MemoryStickIcon className="w-4 h-4" /> RAM Allocation (GB)
-                  </label>
+                  <div className="flex items-center justify-between gap-4 mb-4">
+                    <label className="flex items-center gap-2 text-sm text-[#8f8f8f]">
+                      <MemoryStickIcon className="w-4 h-4" /> RAM Allocation (Memory)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-mono text-[#8f8f8f]">Custom RAM:</span>
+                      <div className="relative w-28">
+                        <input
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          className="inp font-mono !py-1.5 !px-2.5 text-xs text-white bg-[#0e0e0e] border border-[#232323] focus:border-white"
+                          value={state.ram}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 1;
+                            const newCpu = state.auto ? (CPU_MAP[val] || Math.max(100, Math.min(1600, Math.round(val * 50 + 50)))) : state.cpu;
+                            setState(prev => ({ ...prev, ram: val, cpu: newCpu }));
+                          }}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#4c4c4c] text-[10px] font-mono pointer-events-none">GB</span>
+                      </div>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {RAM.map(r => (
                       <button 

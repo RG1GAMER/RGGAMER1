@@ -1,8 +1,22 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
-import { importWorld, getWorldInfo, analyzeWorld } from "../controllers/world.js";
+import {
+  importWorld,
+  getWorldInfo,
+  analyzeWorld,
+  listWorlds,
+  setActiveWorld,
+  optimizeWorld,
+  generateWorld,
+  downloadWorld,
+  getDatapacks,
+  toggleDatapack,
+  deleteDatapack,
+  getResourcePackSettings,
+  saveResourcePackSettings
+} from "../controllers/world.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, unzipFile, zipFiles, installPlugin, installMod, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar } from "../controllers/servers.js";
+import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar } from "../controllers/servers.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -68,9 +82,22 @@ router.post("/:id/files/save", saveFileContent);
 router.post("/:id/files/create", createFile);
 router.post("/:id/files/mkdir", createDirectory);
 router.post("/:id/files/unzip", unzipFile);
+router.get("/:id/worlds", listWorlds);
+router.post("/:id/world/set-active", setActiveWorld);
 router.post("/:id/world/analyze", analyzeWorld);
 router.post("/:id/world/import", importWorld);
+router.post("/:id/world/optimize", optimizeWorld);
+router.post("/:id/world/generate", generateWorld);
+router.get("/:id/world/download", downloadWorld);
 router.get("/:id/world/info", getWorldInfo);
+
+// Datapack and Resource Pack endpoints
+router.get("/:id/datapacks", getDatapacks);
+router.post("/:id/datapacks/toggle", toggleDatapack);
+router.delete("/:id/datapacks", deleteDatapack);
+router.get("/:id/resource-pack", getResourcePackSettings);
+router.post("/:id/resource-pack", saveResourcePackSettings);
+
 router.post("/:id/files/zip", zipFiles);
 router.delete("/:id/files", deleteFile);
 
@@ -474,4 +501,8 @@ router.delete("/:id/sftp", async (req, res) => {
 
 router.post("/:id/plugins/install", installPlugin);
 router.post("/:id/mods/install", installMod);
+router.post("/:id/resourcepacks/install", installResourcePack);
+router.post("/:id/datapacks/install", installDatapack);
+router.get("/:id/installed-packages", getInstalledPackages);
+router.post("/:id/packages/uninstall", uninstallPackage);
 export default router;

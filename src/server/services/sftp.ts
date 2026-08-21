@@ -106,9 +106,17 @@ export async function initSFTPServer() {
     });
   });
 
-  server.listen(SFTP_PORT, "0.0.0.0", () => {
-    console.log(`SFTP server listening on port ${SFTP_PORT}`);
+  server.on("error", (err: any) => {
+    console.warn(`[SFTP Server] Notice: ${err.message}`);
   });
+
+  try {
+    server.listen(SFTP_PORT, "0.0.0.0", () => {
+      console.log(`SFTP server listening on port ${SFTP_PORT}`);
+    });
+  } catch (err: any) {
+    console.warn(`[SFTP Server] Could not bind to port ${SFTP_PORT}: ${err.message}`);
+  }
 
   process.on("SIGTERM", () => server.close());
   process.on("SIGINT", () => server.close());

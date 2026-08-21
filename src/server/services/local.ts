@@ -15,44 +15,15 @@ const processes = new Map<string, ChildProcess>();
 const localStartedAt = new Map<string, string>();
 const activeStreams = new Set<string>();
 
+import { resolveJavaMajorVersion } from "./javaRuntimeResolver.js";
+
 export const resolveJavaBinary = async (serverData?: any, onLog?: (msg: string) => void): Promise<string> => {
   if (process.env.JAVA_BIN && await fs.pathExists(process.env.JAVA_BIN)) {
     return process.env.JAVA_BIN;
   }
 
-  // Determine target Java major version (8, 11, 17, 21, 25)
-  let targetVer = "25";
-  if (serverData?.javaVersion && String(serverData.javaVersion).trim() !== "" && String(serverData.javaVersion).trim().toLowerCase() !== "auto") {
-    targetVer = String(serverData.javaVersion).trim().toLowerCase().replace(/^java-?/, '');
-  } else {
-    const verStr = String(serverData?.version || "latest").toLowerCase().trim();
-    if (
-      verStr === "latest" ||
-      verStr === "" ||
-      verStr === "default" ||
-      verStr.startsWith("26") ||
-      verStr.startsWith("1.26") ||
-      verStr.startsWith("1.25") ||
-      verStr.startsWith("1.22") ||
-      verStr.startsWith("1.23") ||
-      verStr.startsWith("1.24") ||
-      verStr.startsWith("25") ||
-      verStr.includes("26w") ||
-      verStr.includes("25w")
-    ) {
-      targetVer = "25";
-    } else if (verStr.startsWith("1.7") || verStr.startsWith("1.8") || verStr.startsWith("1.9") || verStr.startsWith("1.10") || verStr.startsWith("1.11") || verStr.startsWith("1.12") || verStr.startsWith("1.13") || verStr.startsWith("1.14") || verStr.startsWith("1.15")) {
-      targetVer = "8";
-    } else if (verStr.startsWith("1.16")) {
-      targetVer = "11";
-    } else if (verStr.startsWith("1.17") || verStr.startsWith("1.18") || verStr.startsWith("1.19") || verStr.startsWith("1.20.1") || verStr.startsWith("1.20.2") || verStr.startsWith("1.20.3") || verStr.startsWith("1.20.4")) {
-      targetVer = "17";
-    } else if (verStr.startsWith("1.21") || verStr.startsWith("1.20.5") || verStr.startsWith("1.20.6")) {
-      targetVer = "21";
-    } else {
-      targetVer = "25";
-    }
-  }
+  // Determine target Java major version (8, 11, 16, 17, 21, 25)
+  const targetVer = resolveJavaMajorVersion(serverData?.version, serverData?.type, serverData?.javaVersion) || "25";
 
   // 1. Check portable JRE in workspace .data/bin/jre-${targetVer}
   const localPortableJava = path.join(process.cwd(), ".data", "bin", `jre-${targetVer}`, "bin", "java");

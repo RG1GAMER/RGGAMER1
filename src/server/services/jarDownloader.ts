@@ -129,13 +129,15 @@ export const downloadJar = async (type: string, version: string, destPath: strin
     );
   }
 
-  // Purpur support for Minecraft 26.2, 26.1.2, 1.21.x
+  // Purpur support for Minecraft 26.2, 26.1.2, 26.1, 1.21.x
   if (normType === "purpur" || normType === "paper") {
     urls.push(
       `https://api.purpurmc.org/v2/purpur/${normVersion}/latest/download`
     );
-    if (normVersion === "26.1") {
+    if (normVersion === "26.1.2" || normVersion === "26.1") {
       urls.push(`https://api.purpurmc.org/v2/purpur/26.1.2/latest/download`);
+      urls.push(`https://api.purpurmc.org/v2/purpur/26.1/latest/download`);
+      urls.push(`https://api.purpurmc.org/v2/purpur/26.2/latest/download`);
     }
   }
 
@@ -151,8 +153,19 @@ export const downloadJar = async (type: string, version: string, destPath: strin
     }
   } catch (e) {}
 
-  // If 26.1 or 26 was requested, also try 26.2 on Paper Fill API
-  if (normVersion === "26.1" || normVersion === "26.0" || normVersion === "26") {
+  // If 26.1.2, 26.1 or 26 was requested, also try 26.1.2 / 26.1 / 26.2 on Paper Fill API
+  if (normVersion.startsWith("26.")) {
+    try {
+      const p2612 = await axios.get(`https://fill.papermc.io/v3/projects/paper/versions/26.1.2/builds/latest`, {
+        headers: DEFAULT_HEADERS,
+        timeout: 8000
+      });
+      const dl2612 = p2612.data?.downloads?.["server:default"]?.url || p2612.data?.downloads?.application?.url;
+      if (dl2612 && !urls.includes(dl2612)) {
+        urls.push(dl2612);
+      }
+    } catch (e) {}
+
     try {
       const p262 = await axios.get(`https://fill.papermc.io/v3/projects/paper/versions/26.2/builds/latest`, {
         headers: DEFAULT_HEADERS,

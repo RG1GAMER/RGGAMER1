@@ -19,7 +19,8 @@ import SubUsersManager from "../components/SubUsersManager";
 import ServerSFTP from "../components/ServerSFTP";
 import PlayitTunnel from "./PlayitTunnel";
 import WorldManager from "../components/WorldManager";
-import { Map } from "lucide-react";
+import ResourcePackManager from "../components/ResourcePackManager";
+import { Map, Palette } from "lucide-react";
 import { Puzzle, Box, Network } from "lucide-react";
 import { Settings, Globe } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
@@ -146,6 +147,7 @@ export default function ServerView() {
     }
 
     tabs.push(
+      { name: "Resource Packs", path: `/servers/${id}/resourcepacks`, exactPath: "resourcepacks", icon: <Palette size={18} /> },
       { name: "Settings", path: `/servers/${id}/settings`, exactPath: "settings", icon: <Settings size={18} /> },
       { name: "Backup", path: `/servers/${id}/backup`, exactPath: "backup", icon: <Archive size={18} /> }
     );
@@ -380,7 +382,9 @@ export default function ServerView() {
              <Route path="/settings" element={<ServerSettings serverId={id!} server={server} />} />
              <Route path="/backup" element={<ServerBackups serverId={id!} />} />
              <Route path="/plugins" element={<PluginManager serverId={id!} />} />
-             <Route path="/mods" element={<ModManager serverId={id!} />} />
+             <Route path="/mods" element={<ResourcePackManager serverId={id!} initialTab="mods" />} />
+             <Route path="/resourcepacks" element={<ResourcePackManager serverId={id!} initialTab="resourcepacks" />} />
+             <Route path="/datapacks" element={<ResourcePackManager serverId={id!} initialTab="datapacks" />} />
              {enablePlayit && <Route path="/playit" element={<PlayitTunnel serverId={id!} />} />}
            </Routes>
         </div>

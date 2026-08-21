@@ -10,6 +10,7 @@ import { readJSON, writeJSON } from "./db.js";
 import { downloadJar } from "./jarDownloader.js";
 import { getServerDiskUsageGB, calculateDockerMemoryStats } from "./metrics.js";
 import { secureDirectoryPermissions, secureFilePermissions, secureExecutablePermissions } from "../utils/permissions.js";
+import { resolveDockerImages, resolveJavaMajorVersion, calculateSafeJvmMemory } from "./javaRuntimeResolver.js";
 
 const getSocketPath = () => {
   if (process.platform === 'win32') return '//./pipe/docker_engine';
@@ -125,7 +126,7 @@ export const getVersions = async (type: string = "PAPER") => {
   }
   
   return [
-    "latest", "26.2", "26.1", "26.0", "26",
+    "latest", "26.2", "26.1.2", "26.1.1", "26.1", "26.0", "26",
     "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.1", "1.21", 
     "1.20.6", "1.20.5", "1.20.4", "1.20.2", "1.20.1", "1.20", 
     "1.19.4", "1.19.3", "1.19.2", "1.19.1", "1.19", 
@@ -148,67 +149,7 @@ export const createServerContainer = async (serverData: any, nodeId?: string) =>
   const isGenericApp = isNode || isPython;
   const isProxy = ["VELOCITY", "BUNGEECORD", "WATERFALL"].includes(serverType);
   
-  let javaTag = "java25";
-  const verStr = String(serverData.version || "latest").toLowerCase().trim();
-  if (serverData.javaVersion && String(serverData.javaVersion).trim() !== "" && String(serverData.javaVersion).trim().toLowerCase() !== "auto") {
-    const rawJv = String(serverData.javaVersion).trim().toLowerCase().replace(/^java-?/, '');
-    javaTag = `java${rawJv}`;
-  } else if (
-    verStr === "latest" ||
-    verStr === "" ||
-    verStr === "default" ||
-    verStr.startsWith("26") ||
-    verStr.startsWith("1.26") ||
-    verStr.startsWith("1.25") ||
-    verStr.startsWith("1.22") ||
-    verStr.startsWith("1.23") ||
-    verStr.startsWith("1.24") ||
-    verStr.startsWith("25") ||
-    verStr.includes("26w") ||
-    verStr.includes("25w")
-  ) {
-    javaTag = "java25";
-  } else if (verStr.startsWith("1.7") || verStr.startsWith("1.8") || verStr.startsWith("1.9") || verStr.startsWith("1.10") || verStr.startsWith("1.11") || verStr.startsWith("1.12") || verStr.startsWith("1.13") || verStr.startsWith("1.14") || verStr.startsWith("1.15")) {
-    javaTag = "java8";
-  } else if (verStr.startsWith("1.16")) {
-    javaTag = "java11";
-  } else if (verStr.startsWith("1.17") || verStr.startsWith("1.18") || verStr.startsWith("1.19") || verStr.startsWith("1.20.1") || verStr.startsWith("1.20.2") || verStr.startsWith("1.20.3") || verStr.startsWith("1.20.4")) {
-    javaTag = "java17";
-  } else if (verStr.startsWith("1.21") || verStr.startsWith("1.20.5") || verStr.startsWith("1.20.6")) {
-    javaTag = "java21";
-  } else {
-    javaTag = "java25";
-  }
-
-  let shortImage = isProxy ? "itzg/bungeecord:latest" : `itzg/minecraft-server:${javaTag}`;
-  let fullImage = isProxy ? "docker.io/itzg/bungeecord:latest" : `docker.io/itzg/minecraft-server:${javaTag}`;
-
-  if (isNode) {
-    const nodeVer = serverData.version || "20";
-    shortImage = `node:${nodeVer}-alpine`;
-    fullImage = `docker.io/library/node:${nodeVer}-alpine`;
-  } else if (isPython) {
-    const pyVer = serverData.version || "3.11";
-    shortImage = `python:${pyVer}-slim`;
-    fullImage = `docker.io/library/python:${pyVer}-slim`;
-  }
-  
-  if (serverData.dockerImage && String(serverData.dockerImage).trim() !== "") {
-    const customImg = String(serverData.dockerImage).trim();
-    // If it is an itzg image, make sure it matches the required Java tag instead of being stuck on an outdated tag
-    if (customImg.includes("itzg/minecraft-server")) {
-      if (javaTag === "java25" && !customImg.includes("java25")) {
-        shortImage = `itzg/minecraft-server:java25`;
-        fullImage = `docker.io/itzg/minecraft-server:java25`;
-      } else {
-        shortImage = customImg;
-        fullImage = customImg.startsWith("docker.io/") ? customImg : `docker.io/${customImg}`;
-      }
-    } else {
-      shortImage = customImg;
-      fullImage = customImg;
-    }
-  }
+  const { shortImage, fullImage, javaTag } = resolveDockerImages(serverData);
 
   const findImageId = async (): Promise<string | null> => {
     try {
@@ -547,38 +488,10 @@ export const startContainer = async (containerId: string, nodeId?: string) => {
         const sType = (server.type || "PAPER").toUpperCase();
         const isMc = !["NODEJS", "NODE", "PYTHON", "PYTHON3", "VELOCITY", "BUNGEECORD", "WATERFALL"].includes(sType);
         if (isMc && (currentImg.includes("itzg/minecraft-server") || currentImg.includes("minecraft-server") || currentImg === "")) {
-          let reqTag = "java25";
-          const verStr = String(server.version || "latest").toLowerCase().trim();
-          if (server.javaVersion && String(server.javaVersion).trim() !== "" && String(server.javaVersion).trim().toLowerCase() !== "auto") {
-            reqTag = `java${String(server.javaVersion).trim().toLowerCase().replace(/^java-?/, '')}`;
-          } else if (
-            verStr === "latest" ||
-            verStr === "" ||
-            verStr === "default" ||
-            verStr.startsWith("26") ||
-            verStr.startsWith("1.26") ||
-            verStr.startsWith("1.25") ||
-            verStr.startsWith("1.22") ||
-            verStr.startsWith("1.23") ||
-            verStr.startsWith("1.24") ||
-            verStr.startsWith("25") ||
-            verStr.includes("26w") ||
-            verStr.includes("25w")
-          ) {
-            reqTag = "java25";
-          } else if (verStr.startsWith("1.7") || verStr.startsWith("1.8") || verStr.startsWith("1.9") || verStr.startsWith("1.10") || verStr.startsWith("1.11") || verStr.startsWith("1.12") || verStr.startsWith("1.13") || verStr.startsWith("1.14") || verStr.startsWith("1.15")) {
-            reqTag = "java8";
-          } else if (verStr.startsWith("1.16")) {
-            reqTag = "java11";
-          } else if (verStr.startsWith("1.17") || verStr.startsWith("1.18") || verStr.startsWith("1.19") || verStr.startsWith("1.20.1") || verStr.startsWith("1.20.2") || verStr.startsWith("1.20.3") || verStr.startsWith("1.20.4")) {
-            reqTag = "java17";
-          } else if (verStr.startsWith("1.21") || verStr.startsWith("1.20.5") || verStr.startsWith("1.20.6")) {
-            reqTag = "java21";
-          } else {
-            reqTag = "java25";
-          }
+          const { javaTag: reqTag, shortImage: expectedShort } = resolveDockerImages(server);
 
-          const needsUpgrade = (reqTag === "java25" && !currentImg.includes("java25")) || 
+          const needsUpgrade = (reqTag && !currentImg.includes(reqTag)) ||
+                               (reqTag === "java25" && !currentImg.includes("java25")) || 
                                (reqTag !== "java25" && currentImg.includes("itzg/minecraft-server") && !currentImg.includes(reqTag));
 
           if (needsUpgrade) {
@@ -590,8 +503,8 @@ export const startContainer = async (containerId: string, nodeId?: string) => {
             if (server.dockerImage && server.dockerImage.includes("itzg/minecraft-server") && !server.dockerImage.includes(reqTag)) {
               server.dockerImage = `itzg/minecraft-server:${reqTag}`;
             }
-            if (reqTag === "java25") {
-              server.javaVersion = "25";
+            if (reqTag) {
+              server.javaVersion = reqTag.replace(/^java/, '');
             }
             
             const newContId = await createServerContainer(server, nodeId);

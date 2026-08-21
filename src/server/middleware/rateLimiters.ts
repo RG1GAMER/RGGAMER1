@@ -14,6 +14,7 @@ export const loginRateLimiter = rateLimit({
   max: 5, // Limit each IP to 5 login attempts per windowMs
   standardHeaders: true, // Return standard RateLimit-* headers
   legacyHeaders: false, // Disable X-RateLimit-* headers
+  validate: { trustProxy: false },
   handler: (req: Request, res: Response) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown_ip";
     const username = req.body?.username || "unknown_user";
@@ -39,6 +40,7 @@ export const registerRateLimiter = rateLimit({
   max: 3, // Limit each IP to 3 register requests per hour
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false },
   handler: (req: Request, res: Response) => {
     const ip = req.ip || req.socket.remoteAddress || "unknown_ip";
     const username = req.body?.username || "unknown_user";

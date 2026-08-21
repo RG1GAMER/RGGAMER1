@@ -15,8 +15,12 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
   const [users, setUsers] = useState<any[]>([]);
   const [owner, setOwner] = useState(server?.owner || "");
   const [ipAlias, setIpAlias] = useState(server?.ipAlias || "");
+  const [ram, setRam] = useState<number>(server?.ram || 4);
+  const [cpu, setCpu] = useState<number>(server?.cpu || 150);
+  const [disk, setDisk] = useState<number>(server?.disk || 10);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAlias, setIsSavingAlias] = useState(false);
+  const [isSavingResources, setIsSavingResources] = useState(false);
   
   const [versions, setVersions] = useState<string[]>([]);
   const [selectedVersion, setSelectedVersion] = useState(server?.version || "");
@@ -162,6 +166,18 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
       alert("Failed to update IP Alias");
     } finally {
       setIsSavingAlias(false);
+    }
+  };
+
+  const handleUpdateResources = async () => {
+    try {
+      setIsSavingResources(true);
+      await axios.put(`/api/servers/${serverId}/resources`, { ram, cpu, disk });
+      alert("Server resource allocation updated successfully!");
+    } catch(e: any) {
+      alert("Failed to update resources: " + (e.response?.data?.error || e.message));
+    } finally {
+      setIsSavingResources(false);
     }
   };
 
@@ -556,7 +572,112 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
                 </div>
               );
             })()}
-<div className="bg-black/40 dark:bg-black/40 backdrop-blur-xl border border-border p-6 md:p-8 rounded-3xl shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] ring-1 ring-border-subtle relative z-20 group hover:bg-black/60 transition-colors mb-8">
+            {/* HARDWARE RESOURCES & RAM ALLOCATION */}
+            {(user?.role === "admin" || user?.role === "owner" || server.owner === user?.id) && (
+              <div className="bg-black/40 dark:bg-black/40 backdrop-blur-xl border border-border p-6 md:p-8 rounded-3xl shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] ring-1 ring-border-subtle relative z-25 group hover:bg-black/60 transition-colors mb-8">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-theme-500 font-bold flex items-center gap-2">
+                    <Sliders className="w-5 h-5 text-theme-500" /> Hardware Resources & Memory (RAM)
+                  </h3>
+                  <span className="text-xs font-mono text-zinc-400">
+                    Current: <strong className="text-white font-bold">{server.ram || 4} GB</strong>
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-sm mb-6">
+                  Dynamically adjust memory limits, CPU processing cores, and NVMe disk quotas for this server instance.
+                </p>
+
+                <div className="space-y-6">
+                  {/* Custom RAM Selection */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                        RAM Limit (GB)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-muted-foreground">Type custom value:</span>
+                        <div className="relative w-24">
+                          <input 
+                            type="number" 
+                            min="0.5" 
+                            step="0.5"
+                            value={ram} 
+                            onChange={e => setRam(parseFloat(e.target.value) || 1)}
+                            className="w-full bg-card border border-border focus:border-theme-600 rounded-lg px-2.5 py-1 text-xs text-foreground font-mono outline-none"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono pointer-events-none">GB</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Quick RAM presets */}
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
+                      {[1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64].map((rVal) => (
+                        <button
+                          key={rVal}
+                          type="button"
+                          onClick={() => setRam(rVal)}
+                          className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all border ${
+                            ram === rVal 
+                              ? "bg-theme-600 text-white border-theme-500 shadow-md shadow-theme-600/30" 
+                              : "bg-card/60 text-muted-foreground hover:text-foreground border-border hover:border-zinc-500"
+                          }`}
+                        >
+                          {rVal} GB
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CPU and Disk */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        CPU Limit (%)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="10" 
+                        max="1600"
+                        step="10"
+                        value={cpu} 
+                        onChange={e => setCpu(parseInt(e.target.value) || 100)}
+                        className="w-full bg-card border border-border focus:border-theme-600 rounded-xl px-4 py-2.5 text-foreground font-mono text-sm outline-none"
+                      />
+                      <span className="text-[11px] text-muted-foreground font-mono mt-1 block">100% = 1 full CPU core</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        Disk Limit (GB)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="1000"
+                        value={disk} 
+                        onChange={e => setDisk(parseInt(e.target.value) || 10)}
+                        className="w-full bg-card border border-border focus:border-theme-600 rounded-xl px-4 py-2.5 text-foreground font-mono text-sm outline-none"
+                      />
+                      <span className="text-[11px] text-muted-foreground font-mono mt-1 block">Max server folder storage quota</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button 
+                      onClick={handleUpdateResources}
+                      disabled={isSavingResources || (ram === server.ram && cpu === server.cpu && disk === server.disk)}
+                      className="px-6 py-2.5 bg-theme-600 hover:bg-theme-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 flex items-center text-sm shadow-lg shadow-theme-600/20 active:scale-95"
+                    >
+                      <Save className={`w-4 h-4 mr-2 ${isSavingResources ? "animate-spin" : ""}`} />
+                      {isSavingResources ? "Applying..." : "Save Resources"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-black/40 dark:bg-black/40 backdrop-blur-xl border border-border p-6 md:p-8 rounded-3xl shadow-[0_0_40px_-15px_rgba(0,0,0,0.5)] ring-1 ring-border-subtle relative z-20 group hover:bg-black/60 transition-colors mb-8">
               <h3 className="text-theme-500 font-bold mb-2 flex items-center">
                 <Globe className="w-5 h-5 mr-2" /> Server IP Alias
               </h3>

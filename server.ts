@@ -26,7 +26,7 @@ import jwt from "jsonwebtoken";
 import { getCorsOriginValidator } from "./src/server/utils/cors.js";
 
 const app = express();
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 const corsOptions: CorsOptions = {
