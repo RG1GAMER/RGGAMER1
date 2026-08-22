@@ -15,9 +15,13 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
   const [users, setUsers] = useState<any[]>([]);
   const [owner, setOwner] = useState(server?.owner || "");
   const [ipAlias, setIpAlias] = useState(server?.ipAlias || "");
-  const [ram, setRam] = useState<number>(server?.ram || 4);
-  const [cpu, setCpu] = useState<number>(server?.cpu || 150);
-  const [disk, setDisk] = useState<number>(server?.disk || 10);
+  const [ram, setRam] = useState<number | string>(server?.ram || 4);
+  const [ramUnit, setRamUnit] = useState<"GB" | "MB">("GB");
+  const [ramInputMB, setRamInputMB] = useState<number | string>(
+    server?.ramMB ? server.ramMB : Math.round((server?.ram || 4) * 1024)
+  );
+  const [cpu, setCpu] = useState<number | string>(server?.cpu || 150);
+  const [disk, setDisk] = useState<number | string>(server?.disk || 10);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAlias, setIsSavingAlias] = useState(false);
   const [isSavingResources, setIsSavingResources] = useState(false);
@@ -53,6 +57,10 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
       setIgnoreWorldDataVersion(!!server.ignoreWorldDataVersion);
       setOwner(server.owner || "");
       setIpAlias(server.ipAlias || "");
+      setRam(server.ram || 4);
+      setRamInputMB(server.ramMB ? server.ramMB : Math.round((server.ram || 4) * 1024));
+      setCpu(server.cpu || 150);
+      setDisk(server.disk || 10);
     }
   }, [server]);
   
@@ -172,7 +180,13 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
   const handleUpdateResources = async () => {
     try {
       setIsSavingResources(true);
-      await axios.put(`/api/servers/${serverId}/resources`, { ram, cpu, disk });
+      const parsedRamMB = typeof ramInputMB === "number" ? ramInputMB : parseInt(String(ramInputMB), 10) || 4096;
+      const parsedRamGB = typeof ram === "number" ? ram : parseFloat(String(ram)) || 4;
+      const parsedCpu = typeof cpu === "number" ? cpu : parseInt(String(cpu), 10) || 100;
+      const parsedDisk = typeof disk === "number" ? disk : parseInt(String(disk), 10) || 10;
+
+      const targetRam = ramUnit === "MB" ? parsedRamMB : parsedRamGB;
+      await axios.put(`/api/servers/${serverId}/resources`, { ram: targetRam, cpu: parsedCpu, disk: parsedDisk });
       alert("Server resource allocation updated successfully!");
     } catch(e: any) {
       alert("Failed to update resources: " + (e.response?.data?.error || e.message));
@@ -580,52 +594,164 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
                     <Sliders className="w-5 h-5 text-theme-500" /> Hardware Resources & Memory (RAM)
                   </h3>
                   <span className="text-xs font-mono text-zinc-400">
-                    Current: <strong className="text-white font-bold">{server.ram || 4} GB</strong>
+                    Current: <strong className="text-white font-bold">{server.ram || 4} GB</strong> ({Math.round((server.ram || 4) * 1024)} MB)
                   </span>
                 </div>
                 <p className="text-muted-foreground text-sm mb-6">
-                  Dynamically adjust memory limits, CPU processing cores, and NVMe disk quotas for this server instance.
+                  Dynamically adjust memory limits (custom MB or GB), CPU processing cores, and NVMe disk quotas for this server instance.
                 </p>
 
                 <div className="space-y-6">
                   {/* Custom RAM Selection */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                        RAM Limit (GB)
-                      </label>
+                  <div className="p-4 rounded-2xl bg-zinc-950/60 border border-white/10 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <label className="text-sm font-semibold text-foreground flex items-center gap-2">
+                          RAM Allocation Limit
+                        </label>
+                        <span className="text-xs font-mono text-muted-foreground block mt-0.5">
+                          Safe bounds: 512 MB to 131,072 MB (128 GB)
+                        </span>
+                      </div>
+
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-muted-foreground">Type custom value:</span>
-                        <div className="relative w-24">
-                          <input 
-                            type="number" 
-                            min="0.5" 
-                            step="0.5"
-                            value={ram} 
-                            onChange={e => setRam(parseFloat(e.target.value) || 1)}
-                            className="w-full bg-card border border-border focus:border-theme-600 rounded-lg px-2.5 py-1 text-xs text-foreground font-mono outline-none"
-                          />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono pointer-events-none">GB</span>
+                        {/* Unit Switcher */}
+                        <div className="flex bg-zinc-900 border border-border rounded-lg p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRamUnit("MB");
+                              const cur = typeof ram === "number" ? ram : (parseFloat(String(ram)) || 4);
+                              setRamInputMB(Math.round(cur * 1024));
+                            }}
+                            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-md transition-all ${
+                              ramUnit === "MB" ? "bg-theme-600 text-white shadow" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            MB
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRamUnit("GB");
+                              const cur = typeof ramInputMB === "number" ? ramInputMB : (parseInt(String(ramInputMB), 10) || 4096);
+                              setRam(Number((cur / 1024).toFixed(2)));
+                            }}
+                            className={`px-2.5 py-1 text-xs font-mono font-bold rounded-md transition-all ${
+                              ramUnit === "GB" ? "bg-theme-600 text-white shadow" : "text-muted-foreground hover:text-white"
+                            }`}
+                          >
+                            GB
+                          </button>
+                        </div>
+
+                        {/* Input Box */}
+                        <div className="relative w-32">
+                          {ramUnit === "MB" ? (
+                            <input 
+                              type="number" 
+                              min="512" 
+                              max="131072"
+                              step="256"
+                              value={ramInputMB} 
+                              onChange={e => {
+                                const valStr = e.target.value;
+                                if (valStr === "") {
+                                  setRamInputMB("");
+                                  setRam("");
+                                  return;
+                                }
+                                const val = parseInt(valStr, 10);
+                                if (!isNaN(val)) {
+                                  setRamInputMB(val);
+                                  setRam(Number((val / 1024).toFixed(3)));
+                                }
+                              }}
+                              className="w-full bg-card border border-border focus:border-theme-600 rounded-lg px-3 py-1 text-xs text-foreground font-mono outline-none pr-10"
+                            />
+                          ) : (
+                            <input 
+                              type="number" 
+                              min="0.5" 
+                              max="128"
+                              step="0.5"
+                              value={ram} 
+                              onChange={e => {
+                                const valStr = e.target.value;
+                                if (valStr === "") {
+                                  setRam("");
+                                  setRamInputMB("");
+                                  return;
+                                }
+                                const val = parseFloat(valStr);
+                                if (!isNaN(val)) {
+                                  setRam(val);
+                                  setRamInputMB(Math.round(val * 1024));
+                                }
+                              }}
+                              className="w-full bg-card border border-border focus:border-theme-600 rounded-lg px-3 py-1 text-xs text-foreground font-mono outline-none pr-10"
+                            />
+                          )}
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono pointer-events-none">
+                            {ramUnit}
+                          </span>
                         </div>
                       </div>
                     </div>
+
+                    {/* Equivalent Display */}
+                    <div className="text-xs font-mono text-slate-400 flex items-center justify-between pt-1 border-t border-white/5">
+                      <span>Equivalent: <strong className="text-theme-400 font-bold">
+                        {ramUnit === "MB" 
+                          ? `${typeof ramInputMB === "number" ? (ramInputMB / 1024).toFixed(2) : (parseInt(String(ramInputMB), 10) ? (parseInt(String(ramInputMB), 10) / 1024).toFixed(2) : 0)} GB` 
+                          : `${typeof ram === "number" ? Math.round(ram * 1024) : (parseFloat(String(ram)) ? Math.round(parseFloat(String(ram)) * 1024) : 0)} MB`}
+                      </strong></span>
+                      {(() => {
+                        const curMB = typeof ramInputMB === "number" ? ramInputMB : (parseInt(String(ramInputMB), 10) || 0);
+                        const curGB = typeof ram === "number" ? ram : (parseFloat(String(ram)) || 0);
+                        const isOutside = ramUnit === "MB" ? (curMB < 512 || curMB > 131072) : (curGB < 0.5 || curGB > 128);
+                        if (isOutside && (curMB > 0 || curGB > 0)) {
+                          return <span className="text-rose-400 font-semibold text-[11px]">⚠️ Outside recommended range (512 MB – 128 GB)</span>;
+                        }
+                        return null;
+                      })()}
+                    </div>
                     
                     {/* Quick RAM presets */}
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-3">
-                      {[1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64].map((rVal) => (
-                        <button
-                          key={rVal}
-                          type="button"
-                          onClick={() => setRam(rVal)}
-                          className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all border ${
-                            ram === rVal 
-                              ? "bg-theme-600 text-white border-theme-500 shadow-md shadow-theme-600/30" 
-                              : "bg-card/60 text-muted-foreground hover:text-foreground border-border hover:border-zinc-500"
-                          }`}
-                        >
-                          {rVal} GB
-                        </button>
-                      ))}
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
+                      {[
+                        { mb: 1024, gb: 1, label: "1024 MB (1G)" },
+                        { mb: 2048, gb: 2, label: "2048 MB (2G)" },
+                        { mb: 3072, gb: 3, label: "3072 MB (3G)" },
+                        { mb: 4096, gb: 4, label: "4096 MB (4G)" },
+                        { mb: 6144, gb: 6, label: "6144 MB (6G)" },
+                        { mb: 8192, gb: 8, label: "8192 MB (8G)" },
+                        { mb: 12288, gb: 12, label: "12288 MB (12G)" },
+                        { mb: 16384, gb: 16, label: "16384 MB (16G)" },
+                        { mb: 24576, gb: 24, label: "24576 MB (24G)" },
+                        { mb: 32768, gb: 32, label: "32768 MB (32G)" },
+                        { mb: 49152, gb: 48, label: "49152 MB (48G)" },
+                        { mb: 65536, gb: 64, label: "65536 MB (64G)" },
+                      ].map((preset) => {
+                        const isSelected = ramUnit === "MB" ? ramInputMB === preset.mb : ram === preset.gb;
+                        return (
+                          <button
+                            key={preset.mb}
+                            type="button"
+                            onClick={() => {
+                              setRam(preset.gb);
+                              setRamInputMB(preset.mb);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all border ${
+                              isSelected 
+                                ? "bg-theme-600 text-white border-theme-500 shadow-md shadow-theme-600/30" 
+                                : "bg-card/60 text-muted-foreground hover:text-foreground border-border hover:border-zinc-500"
+                            }`}
+                          >
+                            {ramUnit === "MB" ? `${preset.mb} MB` : `${preset.gb} GB`}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -641,7 +767,10 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
                         max="1600"
                         step="10"
                         value={cpu} 
-                        onChange={e => setCpu(parseInt(e.target.value) || 100)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setCpu(val === "" ? "" : parseInt(val, 10));
+                        }}
                         className="w-full bg-card border border-border focus:border-theme-600 rounded-xl px-4 py-2.5 text-foreground font-mono text-sm outline-none"
                       />
                       <span className="text-[11px] text-muted-foreground font-mono mt-1 block">100% = 1 full CPU core</span>
@@ -656,7 +785,10 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
                         min="1" 
                         max="1000"
                         value={disk} 
-                        onChange={e => setDisk(parseInt(e.target.value) || 10)}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDisk(val === "" ? "" : parseInt(val, 10));
+                        }}
                         className="w-full bg-card border border-border focus:border-theme-600 rounded-xl px-4 py-2.5 text-foreground font-mono text-sm outline-none"
                       />
                       <span className="text-[11px] text-muted-foreground font-mono mt-1 block">Max server folder storage quota</span>
@@ -666,7 +798,7 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
                   <div className="flex justify-end pt-2">
                     <button 
                       onClick={handleUpdateResources}
-                      disabled={isSavingResources || (ram === server.ram && cpu === server.cpu && disk === server.disk)}
+                      disabled={isSavingResources || ((ramUnit === "MB" ? ramInputMB === (server.ramMB || Math.round((server.ram || 4) * 1024)) : ram === server.ram) && cpu === server.cpu && disk === server.disk)}
                       className="px-6 py-2.5 bg-theme-600 hover:bg-theme-500 text-white font-semibold rounded-xl transition-all disabled:opacity-50 flex items-center text-sm shadow-lg shadow-theme-600/20 active:scale-95"
                     >
                       <Save className={`w-4 h-4 mr-2 ${isSavingResources ? "animate-spin" : ""}`} />

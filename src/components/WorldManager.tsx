@@ -382,8 +382,8 @@ export default function WorldManager({
         </div>
       )}
 
-      {/* DIMENSION CARDS CONTAINER (Exact Screenshot Style) */}
-      <div className="space-y-4">
+      {/* DIMENSION CARDS CONTAINER (Clean Single-Line Format per World) */}
+      <div className="space-y-3">
         {/* CARD 1: OVERWORLD */}
         {(() => {
           const overworld = worlds.find((w) => w.dimension === "overworld" || w.isPrimary) || worlds[0];
@@ -392,25 +392,45 @@ export default function WorldManager({
           const chunkCount = overworld?.chunkCount || 0;
 
           return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-3xl p-5 sm:p-6 transition-all shadow-xl space-y-4">
+            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Wireframe Globe Icon + Title & Badges */}
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400 shadow-inner">
-                    <Globe className="w-6 h-6 sm:w-7 sm:h-7" />
+                {/* Left: Wireframe Globe Icon + Title & Badges + Inline Concise Metadata */}
+                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400 shadow-inner">
+                    <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
 
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h2 className="text-lg sm:text-xl font-black text-white font-mono whitespace-nowrap">
+                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
                       World (Overworld)
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
                       Overworld
                     </span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-mono font-bold bg-zinc-900 border border-white/20 text-white">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
                       Active World
                     </span>
+                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
+                      <span>•</span>
+                      <span>Folder: /{name}</span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                        {size} MB
+                      </span>
+                      <span>•</span>
+                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Mobile-only metadata line */}
+                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
+                  <span>Folder: /{name}</span>
+                  <span>•</span>
+                  <span>{size} MB</span>
+                  <span>•</span>
+                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
                 </div>
 
                 {/* Right: Action Buttons Group */}
@@ -421,18 +441,18 @@ export default function WorldManager({
                       setTargetFolderName(name);
                       setShowUploadModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Upload className="w-4 h-4" /> Upload
+                    <Upload className="w-3.5 h-3.5" /> Upload
                   </button>
 
                   {/* Download */}
                   <a
                     href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
                     download={`${name}.zip`}
-                    className="px-4 py-2 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Download className="w-4 h-4" /> Download
+                    <Download className="w-3.5 h-3.5" /> Download
                   </a>
 
                   {/* Generate */}
@@ -441,37 +461,18 @@ export default function WorldManager({
                       setGenTargetWorld(name);
                       setShowGenerateModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <SlidersHorizontal className="w-4 h-4" /> Generate
+                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
                   </button>
 
                   {/* Optimize */}
                   <button
                     onClick={() => setShowOptimizeModal(name)}
-                    className="px-4 py-2 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Zap className="w-4 h-4 text-amber-400" /> Optimize
+                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
                   </button>
-                </div>
-              </div>
-
-              {/* Bottom Full-Width Description & Metadata */}
-              <div className="space-y-1.5 pt-2 border-t border-white/5">
-                <p className="text-xs sm:text-sm text-slate-300 font-mono">
-                  The primary surface world with regular terrain, biomes, and daylight cycle.
-                </p>
-
-                {/* Metadata line: Folder: /world • 💾 0 MB • 0 region files */}
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-400 flex-wrap">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                    {size} MB
-                  </span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
                 </div>
               </div>
             </div>
@@ -486,22 +487,42 @@ export default function WorldManager({
           const chunkCount = nether?.chunkCount || 0;
 
           return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-3xl p-5 sm:p-6 transition-all shadow-xl space-y-4">
+            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Flame Icon + Title & Badges */}
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-center shrink-0 text-rose-500 shadow-inner">
-                    <Flame className="w-6 h-6 sm:w-7 sm:h-7" />
+                {/* Left: Flame Icon + Title & Badges + Inline Concise Metadata */}
+                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-center shrink-0 text-rose-500 shadow-inner">
+                    <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
 
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h2 className="text-lg sm:text-xl font-black text-white font-mono whitespace-nowrap">
+                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
                       World Nether
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
                       Nether
                     </span>
+                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
+                      <span>•</span>
+                      <span>Folder: /{name}</span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                        {size} MB
+                      </span>
+                      <span>•</span>
+                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Mobile-only metadata line */}
+                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
+                  <span>Folder: /{name}</span>
+                  <span>•</span>
+                  <span>{size} MB</span>
+                  <span>•</span>
+                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
                 </div>
 
                 {/* Right: Action Buttons Group */}
@@ -512,18 +533,18 @@ export default function WorldManager({
                       setTargetFolderName(name);
                       setShowUploadModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Upload className="w-4 h-4" /> Upload
+                    <Upload className="w-3.5 h-3.5" /> Upload
                   </button>
 
                   {/* Download */}
                   <a
                     href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
                     download={`${name}.zip`}
-                    className="px-4 py-2 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Download className="w-4 h-4" /> Download
+                    <Download className="w-3.5 h-3.5" /> Download
                   </a>
 
                   {/* Generate */}
@@ -532,55 +553,36 @@ export default function WorldManager({
                       setGenTargetWorld(name);
                       setShowGenerateModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <SlidersHorizontal className="w-4 h-4" /> Generate
+                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
                   </button>
 
                   {/* Optimize */}
                   <button
                     onClick={() => setShowOptimizeModal(name)}
-                    className="px-4 py-2 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Zap className="w-4 h-4 text-amber-400" /> Optimize
+                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
                   </button>
 
                   {/* Play / Reset Icon Button */}
                   <button
                     onClick={() => handleOptimizeWorld(name)}
-                    className="p-2 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-2xl transition-all shadow-sm active:scale-95"
+                    className="p-1.5 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-xl transition-all shadow-sm active:scale-95"
                     title="Reload dimension chunks"
                   >
-                    <Play className="w-4 h-4" />
+                    <Play className="w-3.5 h-3.5" />
                   </button>
 
                   {/* Trash Icon Button */}
                   <button
                     onClick={() => setShowDeleteModal(name)}
-                    className="p-2 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-2xl transition-all shadow-sm active:scale-95"
+                    className="p-1.5 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-xl transition-all shadow-sm active:scale-95"
                     title="Delete / Reset Nether Dimension"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-
-              {/* Bottom Full-Width Description & Metadata */}
-              <div className="space-y-1.5 pt-2 border-t border-white/5">
-                <p className="text-xs sm:text-sm text-slate-300 font-mono">
-                  The fiery underworld dimension containing nether fortresses and bastions.
-                </p>
-
-                {/* Metadata line: Folder: /world_nether • 💾 0 MB • 0 region files */}
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-400 flex-wrap">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                    {size} MB
-                  </span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
                 </div>
               </div>
             </div>
@@ -595,22 +597,42 @@ export default function WorldManager({
           const chunkCount = end?.chunkCount || 0;
 
           return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-3xl p-5 sm:p-6 transition-all shadow-xl space-y-4">
+            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Star / Sparkle Icon + Title & Badges */}
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border border-purple-500/30 bg-purple-500/10 flex items-center justify-center shrink-0 text-purple-400 shadow-inner">
-                    <Sparkles className="w-6 h-6 sm:w-7 sm:h-7" />
+                {/* Left: Star / Sparkle Icon + Title & Badges + Inline Concise Metadata */}
+                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-purple-500/30 bg-purple-500/10 flex items-center justify-center shrink-0 text-purple-400 shadow-inner">
+                    <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
 
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h2 className="text-lg sm:text-xl font-black text-white font-mono whitespace-nowrap">
+                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
                       World End
                     </h2>
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
                       The End
                     </span>
+                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
+                      <span>•</span>
+                      <span>Folder: /{name}</span>
+                      <span>•</span>
+                      <span className="inline-flex items-center gap-1">
+                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                        {size} MB
+                      </span>
+                      <span>•</span>
+                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
+                    </div>
                   </div>
+                </div>
+
+                {/* Mobile-only metadata line */}
+                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
+                  <span>Folder: /{name}</span>
+                  <span>•</span>
+                  <span>{size} MB</span>
+                  <span>•</span>
+                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
                 </div>
 
                 {/* Right: Action Buttons Group */}
@@ -621,18 +643,18 @@ export default function WorldManager({
                       setTargetFolderName(name);
                       setShowUploadModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Upload className="w-4 h-4" /> Upload
+                    <Upload className="w-3.5 h-3.5" /> Upload
                   </button>
 
                   {/* Download */}
                   <a
                     href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
                     download={`${name}.zip`}
-                    className="px-4 py-2 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Download className="w-4 h-4" /> Download
+                    <Download className="w-3.5 h-3.5" /> Download
                   </a>
 
                   {/* Generate */}
@@ -641,160 +663,41 @@ export default function WorldManager({
                       setGenTargetWorld(name);
                       setShowGenerateModal(name);
                     }}
-                    className="px-4 py-2 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <SlidersHorizontal className="w-4 h-4" /> Generate
+                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
                   </button>
 
                   {/* Optimize */}
                   <button
                     onClick={() => setShowOptimizeModal(name)}
-                    className="px-4 py-2 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
                   >
-                    <Zap className="w-4 h-4 text-amber-400" /> Optimize
+                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
                   </button>
 
                   {/* Play / Reset Icon Button */}
                   <button
                     onClick={() => handleOptimizeWorld(name)}
-                    className="p-2 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-2xl transition-all shadow-sm active:scale-95"
+                    className="p-1.5 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-xl transition-all shadow-sm active:scale-95"
                     title="Reload dimension chunks"
                   >
-                    <Play className="w-4 h-4" />
+                    <Play className="w-3.5 h-3.5" />
                   </button>
 
                   {/* Trash Icon Button */}
                   <button
                     onClick={() => setShowDeleteModal(name)}
-                    className="p-2 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-2xl transition-all shadow-sm active:scale-95"
+                    className="p-1.5 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-xl transition-all shadow-sm active:scale-95"
                     title="Delete / Reset End Dimension"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </div>
-              </div>
-
-              {/* Bottom Full-Width Description & Metadata */}
-              <div className="space-y-1.5 pt-2 border-t border-white/5">
-                <p className="text-xs sm:text-sm text-slate-300 font-mono">
-                  The dark void dimension home to the Ender Dragon, End Cities, and Elytras.
-                </p>
-
-                {/* Metadata line: Folder: /world_the_end • 💾 0 MB • 0 region files */}
-                <div className="flex items-center gap-2 text-xs font-mono text-slate-400 flex-wrap">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span className="inline-flex items-center gap-1">
-                    <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                    {size} MB
-                  </span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
                 </div>
               </div>
             </div>
           );
         })()}
-      </div>
-
-      {/* GUIDES & DIMENSION DETAILS (Exact Screenshot Content & Typography) */}
-      <div className="space-y-4 pt-6 border-t border-white/10">
-        <h3 className="text-lg font-black tracking-tight text-white font-mono">
-          Guides & Dimension Details
-        </h3>
-
-        {/* 1. How dimensions work in Minecraft */}
-        <div className="bg-zinc-950/80 border border-white/10 rounded-3xl p-6 space-y-4">
-          <h4 className="text-base font-bold text-white font-mono flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-theme-400" /> How dimensions work in Minecraft
-          </h4>
-          <p className="text-xs sm:text-sm text-slate-300 font-mono">
-            Minecraft servers manage three distinct dimensions for every gameplay world:
-          </p>
-
-          <div className="space-y-3 pt-2 text-xs sm:text-sm font-mono">
-            <div className="p-3.5 bg-black/40 border border-white/5 rounded-2xl space-y-1">
-              <strong className="text-emerald-400 block font-bold">1. World (Overworld)</strong>
-              <p className="text-slate-300 leading-relaxed">
-                Stores surface terrain, oceans, villages, mineshafts, player homes, and spawn points.
-              </p>
-            </div>
-
-            <div className="p-3.5 bg-black/40 border border-white/5 rounded-2xl space-y-1">
-              <strong className="text-rose-400 block font-bold">2. World Nether</strong>
-              <p className="text-slate-300 leading-relaxed">
-                Stores nether portals, lava lakes, fortresses, bastions, and piglin structures.
-              </p>
-            </div>
-
-            <div className="p-3.5 bg-black/40 border border-white/5 rounded-2xl space-y-1">
-              <strong className="text-purple-400 block font-bold">3. World End</strong>
-              <p className="text-slate-300 leading-relaxed">
-                Stores the central dragon island, outer End islands, chorus plants, and End Cities.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* 2. How to upload custom world maps */}
-        <div className="bg-zinc-950/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-3">
-          <button
-            onClick={() => setOpenUploadGuide(!openUploadGuide)}
-            className="w-full flex items-center justify-between text-left"
-          >
-            <h4 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
-              <Upload className="w-4 h-4 text-blue-400" /> How to upload custom world maps
-            </h4>
-            {openUploadGuide ? (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            )}
-          </button>
-
-          {openUploadGuide && (
-            <div className="text-xs sm:text-sm text-slate-300 font-mono space-y-2 pt-2 border-t border-white/5">
-              <p>
-                You can upload your world either as a <strong className="text-white">.zip archive</strong> or by placing folder files directly:
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-slate-400">
-                <li>Make sure your uploaded archive includes <code className="text-theme-400">level.dat</code> and the <code className="text-theme-400">region/</code> folder.</li>
-                <li>When importing into a custom folder, the server automatically maps your active level in <code className="text-theme-400">server.properties</code>.</li>
-                <li>The server will safely shut down during extraction and restart with your custom map intact.</li>
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* 3. Optimize option (Disk Space Saver) */}
-        <div className="bg-zinc-950/80 border border-white/10 rounded-3xl p-5 sm:p-6 space-y-3">
-          <button
-            onClick={() => setOpenOptimizeGuide(!openOptimizeGuide)}
-            className="w-full flex items-center justify-between text-left"
-          >
-            <h4 className="text-sm sm:text-base font-bold text-white font-mono flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" /> Optimize option (Disk Space Saver)
-            </h4>
-            {openOptimizeGuide ? (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            )}
-          </button>
-
-          {openOptimizeGuide && (
-            <div className="text-xs sm:text-sm text-slate-300 font-mono space-y-2 pt-2 border-t border-white/5">
-              <p>
-                Minecraft automatically generates hundreds of empty chunks around players as they explore.
-              </p>
-              <ul className="list-disc pl-5 space-y-1 text-slate-400">
-                <li><strong className="text-white">Chunk Pruning:</strong> Automatically scans and removes 0-byte or unpopulated region fragments.</li>
-                <li><strong className="text-white">Session Cleanup:</strong> Removes lingering <code className="text-zinc-300">session.lock</code> locks to speed up server boot times.</li>
-                <li><strong className="text-white">Compatibility:</strong> Fully compatible with Vanilla, Paper, Spigot, Purpur, and modded biomes.</li>
-              </ul>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* OPTIMIZE MODAL */}

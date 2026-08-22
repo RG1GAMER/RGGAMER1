@@ -20,8 +20,10 @@ import ServerSFTP from "../components/ServerSFTP";
 import PlayitTunnel from "./PlayitTunnel";
 import WorldManager from "../components/WorldManager";
 import ResourcePackManager from "../components/ResourcePackManager";
+import AddonsManager from "../components/AddonsManager";
+import SoftwareManager from "../components/SoftwareManager";
 import { Map, Palette } from "lucide-react";
-import { Puzzle, Box, Network } from "lucide-react";
+import { Puzzle, Box, Network, Cpu, Layers as LayersIcon } from "lucide-react";
 import { Settings, Globe } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
 
@@ -120,6 +122,7 @@ export default function ServerView() {
       { name: "Console", path: `/servers/${id}`, exactPath: "", icon: <Terminal size={18} /> },
       { name: "File Manager", path: `/servers/${id}/files`, exactPath: "files", icon: <Folder size={18} /> },
       { name: "SFTP Details", path: `/servers/${id}/sftp`, exactPath: "sftp", icon: <Network size={18} /> },
+      { name: "Software", path: `/servers/${id}/software`, exactPath: "software", icon: <LayersIcon size={18} /> },
       { name: "Backup", path: `/servers/${id}/backup`, exactPath: "backup", icon: <Archive size={18} /> },
       { name: "Sub-Users", path: `/servers/${id}/subusers`, exactPath: "subusers", icon: <Users size={18} /> },
       { name: "Settings", path: `/servers/${id}/settings`, exactPath: "settings", icon: <Settings size={18} /> },
@@ -136,6 +139,7 @@ export default function ServerView() {
     if (!isProxy) {
       tabs.splice(1, 0, { name: "Properties", path: `/servers/${id}/properties`, exactPath: "properties", icon: <Sliders size={18} /> });
       tabs.splice(2, 0, { name: "World", path: `/servers/${id}/world`, exactPath: "world", icon: <Map size={18} /> });
+      tabs.splice(3, 0, { name: "Add-ons", path: `/servers/${id}/addons`, exactPath: "addons", icon: <Box size={18} /> });
     }
 
     if (["PAPER", "SPIGOT", "PURPUR", "BUNGEECORD", "VELOCITY", "WATERFALL"].includes(serverTypeUpper)) {
@@ -147,8 +151,8 @@ export default function ServerView() {
     }
 
     tabs.push(
-      { name: "Resource Packs", path: `/servers/${id}/resourcepacks`, exactPath: "resourcepacks", icon: <Palette size={18} /> },
       { name: "Settings", path: `/servers/${id}/settings`, exactPath: "settings", icon: <Settings size={18} /> },
+      { name: "Software", path: `/servers/${id}/software`, exactPath: "software", icon: <LayersIcon size={18} /> },
       { name: "Backup", path: `/servers/${id}/backup`, exactPath: "backup", icon: <Archive size={18} /> }
     );
 
@@ -373,20 +377,22 @@ export default function ServerView() {
           <div className="flex-1 flex flex-col relative overflow-hidden bg-transparent min-h-0">
             <Routes>
               <Route path="/" element={<ServerConsole serverId={id!} server={server} />} />
-             <Route path="/players" element={<PlayerManager serverId={id!} />} />
-             <Route path="/properties" element={<ServerProperties serverId={id!} />} />
-             <Route path="/world" element={<WorldManager serverId={id!} server={server} onNavigateToFileManager={() => navigate(`/servers/${id}/files`)} />} />
-             <Route path="/files" element={<FileManager serverId={id!} />} />
-             <Route path="/sftp" element={<ServerSFTP serverId={id!} server={server} />} />
-             <Route path="/subusers" element={<SubUsersManager serverId={id!} />} />
-             <Route path="/settings" element={<ServerSettings serverId={id!} server={server} />} />
-             <Route path="/backup" element={<ServerBackups serverId={id!} />} />
-             <Route path="/plugins" element={<PluginManager serverId={id!} />} />
-             <Route path="/mods" element={<ResourcePackManager serverId={id!} initialTab="mods" />} />
-             <Route path="/resourcepacks" element={<ResourcePackManager serverId={id!} initialTab="resourcepacks" />} />
-             <Route path="/datapacks" element={<ResourcePackManager serverId={id!} initialTab="datapacks" />} />
-             {enablePlayit && <Route path="/playit" element={<PlayitTunnel serverId={id!} />} />}
-           </Routes>
+              <Route path="/players" element={<PlayerManager serverId={id!} />} />
+              <Route path="/properties" element={<ServerProperties serverId={id!} />} />
+              <Route path="/world" element={<WorldManager serverId={id!} server={server} onNavigateToFileManager={() => navigate(`/servers/${id}/files`)} />} />
+              <Route path="/files" element={<FileManager serverId={id!} />} />
+              <Route path="/sftp" element={<ServerSFTP serverId={id!} server={server} />} />
+              <Route path="/subusers" element={<SubUsersManager serverId={id!} />} />
+              <Route path="/settings" element={<ServerSettings serverId={id!} server={server} />} />
+              <Route path="/software" element={<SoftwareManager serverId={id!} server={server} onServerUpdated={fetchServer} />} />
+              <Route path="/backup" element={<ServerBackups serverId={id!} />} />
+              <Route path="/addons" element={<AddonsManager serverId={id!} initialCategory="all" />} />
+              <Route path="/plugins" element={<PluginManager serverId={id!} />} />
+              <Route path="/mods" element={<AddonsManager serverId={id!} initialCategory="mods" />} />
+              <Route path="/resourcepacks" element={<AddonsManager serverId={id!} initialCategory="resourcepacks" />} />
+              <Route path="/datapacks" element={<AddonsManager serverId={id!} initialCategory="datapacks" />} />
+              {enablePlayit && <Route path="/playit" element={<PlayitTunnel serverId={id!} />} />}
+            </Routes>
         </div>
       </div>
 

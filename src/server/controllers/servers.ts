@@ -2127,9 +2127,19 @@ export const updateResources = async (req: Request, res: Response) => {
     if (!server) return res.status(404).json({ error: "Server not found" });
     if ((req as any).user.role !== "admin" && (req as any).user.role !== "owner") return res.status(403).json({ error: "Unauthorized" });
 
-    server.ram = Number(ram);
-    server.cpu = Number(cpu);
-    server.disk = Number(disk);
+    // Safe bounds validation for RAM in MB/GB, CPU, and NVMe Disk
+    const rawRam = Number(ram) || (server.ram ? Number(server.ram) : 2);
+    // If ram is >= 256, it represents MB; otherwise it is in GB
+    const parsedMb = rawRam >= 256 ? Math.round(rawRam) : Math.round(rawRam * 1024);
+    const safeRamMB = Math.max(512, Math.min(131072, parsedMb)); // 512 MB to 128 GB safe envelope
+    const safeRamGB = Number((safeRamMB / 1024).toFixed(3));
+    const safeCpu = Math.max(10, Math.min(3200, Number(cpu) || 100));
+    const safeDisk = Math.max(1, Math.min(10000, Number(disk) || 10));
+
+    server.ram = safeRamGB;
+    server.ramMB = safeRamMB;
+    server.cpu = safeCpu;
+    server.disk = safeDisk;
 
     // Stop and recreate container if running or existing
     if (server.containerId) {

@@ -10,14 +10,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      axios.get("/api/auth/me").then(res => {
+      axios.get("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
         setUser(res.data.user);
         setLoading(false);
-      }).catch(() => {
-        setToken(null);
-        localStorage.removeItem("jtg_token");
-        setUser(null);
+      }).catch((err) => {
+        if (err.response?.status === 401) {
+          setToken(null);
+          localStorage.removeItem("jtg_token");
+          setUser(null);
+        }
         setLoading(false);
       });
     } else {
@@ -26,19 +29,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, [token]);
 
   useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
+    // Request interceptor: ONLY attach Authorization header for internal endpoints (/api/ or relative)
+    const reqInterceptor = axios.interceptors.request.use((config) => {
+      const url = config.url || "";
+      const isInternal = url.startsWith("/api/") || (!url.startsWith("http://") && !url.startsWith("https://"));
+      const storedToken = localStorage.getItem("jtg_token");
+      
+      if (isInternal && storedToken) {
+        config.headers = config.headers || {};
+        config.headers["Authorization"] = `Bearer ${storedToken}`;
+      } else if (!isInternal && config.headers) {
+        // Strip authorization for external third-party APIs
+        delete config.headers["Authorization"];
+        delete config.headers["authorization"];
+      }
+      return config;
+    });
+
+    // Response interceptor: ONLY redirect/logout on 401 if it came from our internal backend API
+    const resInterceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response?.status === 401) {
+        const url = error.config?.url || "";
+        const isInternal = url.startsWith("/api/") || (!url.startsWith("http://") && !url.startsWith("https://"));
+        const isAuthEndpoint = url.includes("/api/auth/login") || url.includes("/api/auth/register");
+        
+        // If our internal API rejected the session as 401 Unauthorized (and not login failure)
+        if (error.response?.status === 401 && isInternal && !isAuthEndpoint) {
           setToken(null);
           setUser(null);
           localStorage.removeItem("jtg_token");
-          delete axios.defaults.headers.common["Authorization"];
         }
         return Promise.reject(error);
       }
     );
-    return () => axios.interceptors.response.eject(interceptor);
+
+    return () => {
+      axios.interceptors.request.eject(reqInterceptor);
+      axios.interceptors.response.eject(resInterceptor);
+    };
   }, []);
 
   const login = (token: string, user: any) => {

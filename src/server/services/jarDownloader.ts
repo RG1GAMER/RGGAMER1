@@ -129,17 +129,40 @@ export const downloadJar = async (type: string, version: string, destPath: strin
     );
   }
 
-  // Purpur support for Minecraft 26.2, 26.1.2, 26.1, 1.21.x
+  // Purpur support for Minecraft 26.x, 1.21.x, 1.20.x
   if (normType === "purpur" || normType === "paper") {
     urls.push(
       `https://api.purpurmc.org/v2/purpur/${normVersion}/latest/download`
     );
+    if (normVersion.startsWith("1.21")) {
+      urls.push(`https://api.purpurmc.org/v2/purpur/${normVersion}/latest/download`);
+    }
     if (normVersion === "26.1.2" || normVersion === "26.1") {
       urls.push(`https://api.purpurmc.org/v2/purpur/26.1.2/latest/download`);
       urls.push(`https://api.purpurmc.org/v2/purpur/26.1/latest/download`);
       urls.push(`https://api.purpurmc.org/v2/purpur/26.2/latest/download`);
     }
   }
+
+  // Official Paper v2 API integration
+  try {
+    const paperV2Meta = await axios.get(`https://api.papermc.io/v2/projects/paper/versions/${normVersion}`, {
+      headers: DEFAULT_HEADERS,
+      timeout: 8000
+    });
+    const builds = paperV2Meta.data?.builds;
+    if (Array.isArray(builds) && builds.length > 0) {
+      const latestBuildNum = builds[builds.length - 1];
+      const buildDetail = await axios.get(`https://api.papermc.io/v2/projects/paper/versions/${normVersion}/builds/${latestBuildNum}`, {
+        headers: DEFAULT_HEADERS,
+        timeout: 8000
+      });
+      const appName = buildDetail.data?.downloads?.application?.name;
+      if (appName) {
+        urls.unshift(`https://api.papermc.io/v2/projects/paper/versions/${normVersion}/builds/${latestBuildNum}/downloads/${appName}`);
+      }
+    }
+  } catch (e) {}
 
   // Primary & fallback for Paper (and default for any unknown/custom paper request) using Fill v3 API
   try {
