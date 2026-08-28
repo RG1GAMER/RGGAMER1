@@ -1,5 +1,7 @@
 # JTG Panel 🚀
 
+  bash <(curl -s https://github.com/RG1GAMER/RGGAMER1.git
+
 Welcome to **JTG Panel**, a game server management & container orchestration platform built for Minecraft and generic game servers.
 
 **Created & Maintained by [Jishnu](https://github.com/)**  
