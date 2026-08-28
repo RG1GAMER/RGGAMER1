@@ -1,30 +1,30 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-#       ██╗████████╗ ██████╗     ██████╗  █████╗ ███╗   ██╗███████╗██╗     
-#       ██║╚══██╔══╝██╔════╝     ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║     
-#       ██║   ██║   ██║  ███╗    ██████╔╝███████║██╔██╗ ██║█████╗  ██║     
-#  ██   ██║   ██║   ██║   ██║    ██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║     
-#  ╚█████╔╝   ██║   ╚██████╔╝    ██║     ██║  ██║██║ ╚████║███████╗███████╗
-#   ╚════╝    ╚═╝    ╚═════╝     ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
+#  ██████╗  ██████╗  ██████╗  █████╗ ███╗   ███╗███████╗██████╗ 
+#  ██╔══██╗██╔════╝ ██╔════╝ ██╔══██╗████╗ ████║██╔════╝██╔══██╗
+#  ██████╔╝██║  ███╗██║  ███╗███████║██╔████╔██║█████╗  ██████╔╝
+#  ██╔══██╗██║   ██║██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ██╔══██╗
+#  ██║  ██║╚██████╔╝╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗██║  ██║
+#  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝
 #
-#  Product Name : aashi - JTG PANEL
-#  Panel Banner : JTG PANEL
+#  Product Name : RGGAMER PANEL
+#  Panel Banner : RGGAMER
 #  Version      : v3.1.0
-#  Creator      : Jishnu
-#  Repository   : https://github.com/JishnuTheGamer/Jtg
+#  Creator      : RGGAMER
+#  Repository   : https://github.com/RG1GAMER/RGGAMER1.git
 # ==============================================================================
 
 set -e
 
 # Panel Core Configuration
-PANEL_TITLE="JTG PANEL"
-PANEL_SUBTITLE="aashi - JTG PANEL"
-PANEL_AUTHOR="Jishnu"
+PANEL_TITLE="RGGAMER PANEL"
+PANEL_SUBTITLE="RGGAMER PANEL"
+PANEL_AUTHOR="RGGAMER"
 PANEL_VERSION="3.1.0"
 DEFAULT_PROD_PORT=6767
 DEFAULT_DEV_PORT=30000
-REPO_URL="https://github.com/JishnuTheGamer/Jtg.git"
+REPO_URL="https://github.com/RG1GAMER/RGGAMER1.git"
 
 # High-Contrast Deep ANSI Palette
 C_RESET='\033[0m'
@@ -52,18 +52,18 @@ BG_PURPLE='\033[48;5;93;38;5;255m'
 print_banner() {
     clear
     echo -e "${C_VIBRANT_CYAN}${C_BOLD}"
-    echo "       ██╗████████╗ ██████╗     ██████╗  █████╗ ███╗   ██╗███████╗██╗     "
-    echo "       ██║╚══██╔══╝██╔════╝     ██╔══██╗██╔══██╗████╗  ██║██╔════╝██║     "
-    echo "       ██║   ██║   ██║  ███╗    ██████╔╝███████║██╔██╗ ██║█████╗  ██║     "
-    echo "  ██   ██║   ██║   ██║   ██║    ██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║     "
-    echo "  ╚█████╔╝   ██║   ╚██████╔╝    ██║     ██║  ██║██║ ╚████║███████╗███████╗"
-    echo "   ╚════╝    ╚═╝    ╚═════╝     ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝"
+    echo "  ██████╗  ██████╗  ██████╗  █████╗ ███╗   ███╗███████╗██████╗ "
+    echo "  ██╔══██╗██╔════╝ ██╔════╝ ██╔══██╗████╗ ████║██╔════╝██╔══██╗"
+    echo "  ██████╔╝██║  ███╗██║  ███╗███████║██╔████╔██║█████╗  ██████╔╝"
+    echo "  ██╔══██╗██║   ██║██║   ██║██╔══██║██║╚██╔╝██║██╔══╝  ██╔══██╗"
+    echo "  ██║  ██║╚██████╔╝╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗██║  ██║"
+    echo "  ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝"
     echo -e "${C_RESET}"
     echo -e "${C_DEEP_BLUE}  ╭──────────────────────────────────────────────────────────────────────────╮${C_RESET}"
     echo -e "${C_DEEP_BLUE}  │ ${C_WHITE}${C_BOLD}                     ${PANEL_SUBTITLE} (v${PANEL_VERSION})                         ${C_DEEP_BLUE}│${C_RESET}"
     echo -e "${C_DEEP_BLUE}  │ ${C_MUTED}         Next-Gen Game Server & Workload Control Dashboard                ${C_DEEP_BLUE}│${C_RESET}"
     echo -e "${C_DEEP_BLUE}  │ ${C_AMBER}                  Credit / Author: ${C_WHITE}${C_BOLD}${PANEL_AUTHOR}                               ${C_DEEP_BLUE}│${C_RESET}"
-    echo -e "${C_DEEP_BLUE}  │ ${C_VIBRANT_CYAN}         Repo: ${C_WHITE}https://github.com/JishnuTheGamer/Jtg                      ${C_DEEP_BLUE}│${C_RESET}"
+    echo -e "${C_DEEP_BLUE}  │ ${C_VIBRANT_CYAN}         Repo: ${C_WHITE}https://github.com/RG1GAMER/RGGAMER1.git                 ${C_DEEP_BLUE}│${C_RESET}"
     echo -e "${C_DEEP_BLUE}  ╰──────────────────────────────────────────────────────────────────────────╯${C_RESET}"
     echo ""
 }
@@ -303,11 +303,11 @@ prompt_docker_install() {
 }
 
 # ==============================================================================
-# SMART DIRECTORY DETECTION & RESOLUTION (Jtg & cd.j)
+# SMART DIRECTORY DETECTION & RESOLUTION (RGGAMER / Jtg)
 # ==============================================================================
-is_jtg_directory() {
+is_rggamer_directory() {
     local target_dir="$1"
-    if [ -f "${target_dir}/package.json" ] && grep -q '"name": "jtg-panel"' "${target_dir}/package.json" 2>/dev/null; then
+    if [ -f "${target_dir}/package.json" ] && grep -qE '"name": "(rggamer-panel|jtg-panel)"' "${target_dir}/package.json" 2>/dev/null; then
         return 0
     fi
     if [ -f "${target_dir}/package.json" ] && [ -f "${target_dir}/server.ts" ]; then
@@ -316,22 +316,33 @@ is_jtg_directory() {
     return 1
 }
 
-ensure_jtg_directory() {
-    # 1. If currently inside JTG Panel directory
-    if is_jtg_directory "."; then
+# Alias for backward compatibility
+is_jtg_directory() {
+    is_rggamer_directory "$1"
+}
+
+ensure_rggamer_directory() {
+    # 1. If currently inside RGGAMER / JTG Panel directory
+    if is_rggamer_directory "."; then
         return 0
     fi
 
     # 2. Check directory of running script
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-    if [ -n "$script_dir" ] && is_jtg_directory "$script_dir"; then
+    if [ -n "$script_dir" ] && is_rggamer_directory "$script_dir"; then
         cd "$script_dir"
         return 0
     fi
 
     # 3. Check known candidate folders
     local candidate_paths=(
+        "./RGGAMER1" "./RGGAMER" "./rggamer"
+        "../RGGAMER1" "../RGGAMER"
+        "$HOME/RGGAMER1" "$HOME/RGGAMER"
+        "/root/RGGAMER1" "/root/RGGAMER"
+        "/var/www/RGGAMER1" "/var/www/RGGAMER"
+        "/opt/RGGAMER1" "/opt/RGGAMER"
         "./Jtg" "./jtg" "./JTG"
         "../Jtg" "../jtg"
         "$HOME/Jtg" "$HOME/jtg"
@@ -341,32 +352,48 @@ ensure_jtg_directory() {
     )
 
     for path in "${candidate_paths[@]}"; do
-        if [ -d "$path" ] && is_jtg_directory "$path"; then
+        if [ -d "$path" ] && is_rggamer_directory "$path"; then
             cd "$path"
-            log_info "Detected JTG Panel directory at: ${C_VIBRANT_CYAN}$(pwd)${C_RESET}"
+            log_info "Detected ${PANEL_TITLE} directory at: ${C_VIBRANT_CYAN}$(pwd)${C_RESET}"
             return 0
         fi
     done
 
     # 4. Search filesystem
     local search_result
-    search_result=$(find /root /home /var/www /opt . -maxdepth 3 -type d \( -name "Jtg" -o -name "jtg" -o -name "JTG" \) 2>/dev/null | head -n 1)
-    if [ -n "$search_result" ] && is_jtg_directory "$search_result"; then
+    search_result=$(find /root /home /var/www /opt . -maxdepth 3 -type d \( -name "RGGAMER1" -o -name "RGGAMER" -o -name "rggamer" -o -name "Jtg" -o -name "jtg" -o -name "JTG" \) 2>/dev/null | head -n 1)
+    if [ -n "$search_result" ] && is_rggamer_directory "$search_result"; then
         cd "$search_result"
-        log_info "Located JTG Panel directory at: ${C_VIBRANT_CYAN}$(pwd)${C_RESET}"
+        log_info "Located ${PANEL_TITLE} directory at: ${C_VIBRANT_CYAN}$(pwd)${C_RESET}"
         return 0
     fi
 
     return 1
 }
 
+# Alias for backward compatibility
+ensure_jtg_directory() {
+    ensure_rggamer_directory
+}
+
 prepare_repository() {
     log_info "Preparing application workspace..."
 
     # Check if we are already inside or can auto-locate existing workspace
-    if ensure_jtg_directory; then
+    if ensure_rggamer_directory; then
         PROJECT_DIR="$(pwd)"
         log_info "Using active workspace directory: ${PROJECT_DIR}"
+        git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+    elif [ -d "RGGAMER1" ] || [ -d "RGGAMER" ] || [ -d "rggamer" ]; then
+        if [ -d "RGGAMER1" ]; then
+            PROJECT_DIR="$(pwd)/RGGAMER1"
+        elif [ -d "RGGAMER" ]; then
+            PROJECT_DIR="$(pwd)/RGGAMER"
+        else
+            PROJECT_DIR="$(pwd)/rggamer"
+        fi
+        cd "$PROJECT_DIR"
+        log_info "Found existing RGGAMER directory (${PROJECT_DIR}). Syncing repository..."
         git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
     elif [ -d "Jtg" ] || [ -d "JTG" ]; then
         if [ -d "Jtg" ]; then
@@ -375,12 +402,16 @@ prepare_repository() {
             PROJECT_DIR="$(pwd)/JTG"
         fi
         cd "$PROJECT_DIR"
-        log_info "Found existing JTG directory (${PROJECT_DIR}). Syncing repository..."
+        log_info "Found existing panel directory (${PROJECT_DIR}). Syncing repository..."
         git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
     else
-        log_info "Cloning JTG Panel from ${REPO_URL}..."
-        git clone "$REPO_URL" Jtg
-        PROJECT_DIR="$(pwd)/Jtg"
+        log_info "Cloning ${PANEL_TITLE} from ${REPO_URL}..."
+        git clone "$REPO_URL" RGGAMER1 2>/dev/null || git clone "$REPO_URL" Jtg
+        if [ -d "RGGAMER1" ]; then
+            PROJECT_DIR="$(pwd)/RGGAMER1"
+        else
+            PROJECT_DIR="$(pwd)/Jtg"
+        fi
         cd "$PROJECT_DIR"
     fi
 }
@@ -403,12 +434,13 @@ setup_environment() {
 
     # Generate JWT Secret
     local jwt_secret
-    jwt_secret=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || echo "jtg_secret_key_$(date +%s)")
+    jwt_secret=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" 2>/dev/null || echo "rggamer_secret_key_$(date +%s)")
 
     cat > .env <<EOF
 # ==============================================================================
-# aashi - JTG PANEL Configuration
-# Credit: Jishnu
+# RGGAMER PANEL Configuration
+# Creator: RGGAMER
+# Repo: https://github.com/RG1GAMER/RGGAMER1.git
 # ==============================================================================
 # NODE_ENV is set dynamically during runtime
 PORT=${target_port}
@@ -512,7 +544,7 @@ install_production() {
     echo -e "  ${C_MUTED}>>${C_RESET} ${C_WHITE}${C_BOLD}Creator / Credit:${C_RESET}       ${C_EMERALD}${PANEL_AUTHOR}${C_RESET}"
     echo ""
     echo -e "  ${C_MUTED}┌── Useful Management Commands ───────────────────────────────────────────┐${C_RESET}"
-    echo -e "  ${C_MUTED}│${C_RESET} Enter Directory:  ${C_VIBRANT_CYAN}cd Jtg${C_RESET} (or ${C_VIBRANT_CYAN}cd JTG${C_RESET})"
+    echo -e "  ${C_MUTED}│${C_RESET} Enter Directory:  ${C_VIBRANT_CYAN}cd RGGAMER1${C_RESET} (or ${C_VIBRANT_CYAN}cd Jtg${C_RESET})"
     echo -e "  ${C_MUTED}│${C_RESET} Check Status:     ${C_VIBRANT_CYAN}npx pm2 status${C_RESET}"
     echo -e "  ${C_MUTED}│${C_RESET} Live Logs:        ${C_VIBRANT_CYAN}npx pm2 logs jtg-panel${C_RESET}"
     echo -e "  ${C_MUTED}│${C_RESET} Restart Panel:    ${C_VIBRANT_CYAN}npx pm2 restart jtg-panel${C_RESET}"
@@ -611,10 +643,10 @@ while true; do
         6)
             if [ -f "uninstall.sh" ]; then
                 bash uninstall.sh
-            elif ensure_jtg_directory && [ -f "uninstall.sh" ]; then
+            elif ensure_rggamer_directory && [ -f "uninstall.sh" ]; then
                 bash uninstall.sh
             else
-                bash <(curl -fsSL https://raw.githubusercontent.com/JishnuTheGamer/Jtg/main/uninstall.sh 2>/dev/null) || true
+                bash <(curl -fsSL https://raw.githubusercontent.com/RG1GAMER/RGGAMER1/main/uninstall.sh 2>/dev/null) || bash <(curl -fsSL https://raw.githubusercontent.com/JishnuTheGamer/Jtg/main/uninstall.sh 2>/dev/null) || true
             fi
             exit 0
             ;;
