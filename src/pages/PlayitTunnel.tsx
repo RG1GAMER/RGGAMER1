@@ -19,11 +19,24 @@ import {
   Check,
   History,
   Terminal,
-  Info
+  Info,
+  Key,
+  Plus,
+  Sparkles,
+  Trash2,
+  ExternalLink,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Sliders,
+  Layers,
+  ArrowUpDown,
+  RotateCcw,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
-import { PlayitDiagnostics, PlayitTunnelHealthStatus, PlayitAuditEntry } from "../types/playit";
+import { PlayitDiagnostics, PlayitTunnelHealthStatus, PlayitAuditEntry, SavedPlayitAgent } from "../types/playit";
 
 export default function PlayitTunnel({ serverId }: { serverId: string }) {
   const [status, setStatus] = useState<"running" | "stopped" | "checking">("checking");
@@ -33,6 +46,13 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
   const [healthData, setHealthData] = useState<any>(null);
   const [diagnostics, setDiagnostics] = useState<PlayitDiagnostics | null>(null);
   const [playerCount, setPlayerCount] = useState<number>(0);
+  const [secretInfo, setSecretInfo] = useState<{ secretKey: string | null; isConfigured: boolean; maskedKey: string | null }>({
+    secretKey: null,
+    isConfigured: false,
+    maskedKey: null
+  });
+  const [savedAgents, setSavedAgents] = useState<SavedPlayitAgent[]>([]);
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [serverRuntimeType, setServerRuntimeType] = useState<string>("docker");
@@ -41,21 +61,61 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
   const [auditLogs, setAuditLogs] = useState<PlayitAuditEntry[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Modals
+  const [showNewTunnelModal, setShowNewTunnelModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
+  const [connectTab, setConnectTab] = useState<"new" | "saved">("new");
+  const [secretInput, setSecretInput] = useState("");
+  const [agentNameInput, setAgentNameInput] = useState("");
+  const [saveProfileChecked, setSaveProfileChecked] = useState(true);
+  const [showSecretText, setShowSecretText] = useState(false);
+  const [isSubmittingSecret, setIsSubmittingSecret] = useState(false);
+  const [switchingAgentId, setSwitchingAgentId] = useState<string | null>(null);
+  const [modalFeedback, setModalFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   const [playerWarningModal, setPlayerWarningModal] = useState<{
     isOpen: boolean;
-    action: "restart" | "force_recover";
+    action: "restart" | "force_recover" | "new_tunnel" | "switch_agent";
+    targetAgentId?: string;
   }>({ isOpen: false, action: "restart" });
 
   const [copiedAddr, setCopiedAddr] = useState(false);
+  const [copiedClaim, setCopiedClaim] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
+  const [isVerifyingClaim, setIsVerifyingClaim] = useState(false);
+  const [claimSuccessNotice, setClaimSuccessNotice] = useState(false);
+
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    // Fast polling (2s) when claimLink is present or tunnel is starting, standard polling (5s) otherwise
+    const pollInterval = (claimLink || (status === "running" && !publicAddress)) ? 2000 : 5000;
+    const interval = setInterval(fetchStatus, pollInterval);
     return () => clearInterval(interval);
-  }, [serverId]);
+  }, [serverId, claimLink, status, publicAddress]);
+
+  // Trigger celebration banner when claim transitions to live public address
+  useEffect(() => {
+    if (publicAddress && !claimLink) {
+      // Check if we just transitioned
+      setClaimSuccessNotice(true);
+      const timer = setTimeout(() => setClaimSuccessNotice(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [publicAddress]);
+
+  const handleVerifyClaimNow = async () => {
+    setIsVerifyingClaim(true);
+    try {
+      await axios.post(`/api/servers/${serverId}/playit/test`);
+      await fetchStatus();
+    } catch (e) {
+      console.error("Failed to verify claim", e);
+    } finally {
+      setIsVerifyingClaim(false);
+    }
+  };
 
   useEffect(() => {
     if (autoScroll && terminalEndRef.current) {
@@ -80,6 +140,12 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
       }
       if (res.data.playerCount !== undefined) {
         setPlayerCount(res.data.playerCount);
+      }
+      if (res.data.secretInfo) {
+        setSecretInfo(res.data.secretInfo);
+      }
+      if (res.data.savedAgents) {
+        setSavedAgents(res.data.savedAgents);
       }
     } catch (e) {
       console.error("Failed to fetch Playit status", e);
@@ -143,19 +209,127 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
     }
   };
 
-  const resetTunnel = async () => {
-    setShowResetConfirm(false);
+  // Option 1: New Tunnel (Purani tunnel delete ho jaye aur new create ho kar connect ho jaye)
+  const requestNewTunnel = () => {
+    if (playerCount > 0) {
+      setPlayerWarningModal({ isOpen: true, action: "new_tunnel" });
+    } else {
+      setShowNewTunnelModal(true);
+    }
+  };
+
+  const executeNewTunnel = async () => {
+    setShowNewTunnelModal(false);
+    setPlayerWarningModal({ isOpen: false, action: "restart" });
     setIsProcessing(true);
     setLogs("");
     setClaimLink(null);
+    setPublicAddress(null);
     try {
       await axios.post(`/api/servers/${serverId}/playit/reset`);
       setStatus("running");
       await fetchStatus();
-    } catch (e) {
-      console.error("Failed to reset tunnel", e);
+    } catch (e: any) {
+      console.error("Failed to create new tunnel", e);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Option 2: Connect Custom Agent Secret Key
+  const handleConnectAgentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secretInput.trim()) {
+      setModalFeedback({ type: "error", message: "Please paste your Playit Agent Secret Key." });
+      return;
+    }
+
+    setIsSubmittingSecret(true);
+    setModalFeedback(null);
+    try {
+      const res = await axios.post(`/api/servers/${serverId}/playit/connect-agent`, {
+        secretKey: secretInput.trim(),
+        agentName: agentNameInput.trim() || undefined,
+        saveProfile: saveProfileChecked
+      });
+
+      if (res.data.savedAgents) setSavedAgents(res.data.savedAgents);
+      if (res.data.secretInfo) setSecretInfo(res.data.secretInfo);
+
+      setModalFeedback({
+        type: "success",
+        message: "Agent Secret connected successfully! Initializing tunnel..."
+      });
+
+      setSecretInput("");
+      setAgentNameInput("");
+      setStatus("running");
+      await fetchStatus();
+
+      setTimeout(() => {
+        setShowConnectModal(false);
+        setModalFeedback(null);
+      }, 1200);
+    } catch (err: any) {
+      setModalFeedback({
+        type: "error",
+        message: err.response?.data?.error || err.response?.data?.details || "Failed to connect Playit Agent."
+      });
+    } finally {
+      setIsSubmittingSecret(false);
+    }
+  };
+
+  // Switch to saved agent
+  const handleSwitchAgent = async (agent: SavedPlayitAgent) => {
+    if (playerCount > 0) {
+      setPlayerWarningModal({
+        isOpen: true,
+        action: "switch_agent",
+        targetAgentId: agent.id
+      });
+      return;
+    }
+    await executeSwitchAgent(agent.id);
+  };
+
+  const executeSwitchAgent = async (agentId: string) => {
+    setPlayerWarningModal({ isOpen: false, action: "restart" });
+    setSwitchingAgentId(agentId);
+    setModalFeedback(null);
+    try {
+      const res = await axios.post(`/api/servers/${serverId}/playit/switch-agent`, { agentId });
+      if (res.data.savedAgents) setSavedAgents(res.data.savedAgents);
+      if (res.data.secretInfo) setSecretInfo(res.data.secretInfo);
+
+      setModalFeedback({
+        type: "success",
+        message: "Successfully switched Playit Agent profile!"
+      });
+      setStatus("running");
+      await fetchStatus();
+
+      setTimeout(() => {
+        setShowConnectModal(false);
+        setModalFeedback(null);
+      }, 1000);
+    } catch (err: any) {
+      setModalFeedback({
+        type: "error",
+        message: err.response?.data?.error || "Failed to switch agent."
+      });
+    } finally {
+      setSwitchingAgentId(null);
+    }
+  };
+
+  // Delete saved agent
+  const handleDeleteSavedAgent = async (agentId: string) => {
+    try {
+      const res = await axios.delete(`/api/servers/${serverId}/playit/saved-agents/${agentId}`);
+      if (res.data.savedAgents) setSavedAgents(res.data.savedAgents);
+    } catch (err: any) {
+      console.error("Failed to delete saved agent profile", err);
     }
   };
 
@@ -202,10 +376,15 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
     }
   };
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, isClaim = false) => {
     navigator.clipboard.writeText(text);
-    setCopiedAddr(true);
-    setTimeout(() => setCopiedAddr(false), 2000);
+    if (isClaim) {
+      setCopiedClaim(true);
+      setTimeout(() => setCopiedClaim(false), 2000);
+    } else {
+      setCopiedAddr(true);
+      setTimeout(() => setCopiedAddr(false), 2000);
+    }
   };
 
   const currentHealth: PlayitTunnelHealthStatus =
@@ -280,39 +459,46 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
   const failureReason = diagnostics?.failureReason || healthData?.failureReason;
   const recommendedAction = diagnostics?.recommendedAction || healthData?.recommendedAction;
 
+  // Identify active matched agent profile
+  const activeProfile = savedAgents.find(
+    (a) => secretInfo.secretKey && a.secretKey && a.secretKey.trim() === secretInfo.secretKey.trim()
+  );
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 md:p-8 h-full overflow-y-auto">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6 pb-20">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6">
           <div>
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-3 mb-1 flex-wrap">
               <h1 className="text-2xl font-bold text-foreground flex items-center gap-2.5">
                 <Globe className="w-6 h-6 text-theme-500" />
-                Playit.gg Tunnel & Health Monitor
+                Playit.gg Tunnel & Agents
               </h1>
               {renderHealthBadge(currentHealth)}
             </div>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Automated tunnel health monitoring, TCP reachability testing, and player-safe recovery for Minecraft.
+              Expose your Minecraft server with high-performance Playit tunnels, multiple agent switching, and auto-healing.
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleRunHealthTest}
               disabled={isTesting || isProcessing}
-              className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted-hover text-foreground font-semibold text-xs rounded-xl border border-border-subtle transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-3.5 py-2 bg-muted hover:bg-muted-hover text-foreground font-semibold text-xs rounded-xl border border-border-subtle transition-all active:scale-95 disabled:opacity-50"
+              title="Test Local TCP and Tunnel Health"
             >
               {isTesting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-theme-500" /> : <Activity className="w-3.5 h-3.5 text-theme-500" />}
-              <span>{isTesting ? "Testing Health..." : "Test Connection"}</span>
+              <span>{isTesting ? "Testing..." : "Test Connection"}</span>
             </button>
 
             {status === "running" && (
               <button
                 onClick={requestRestart}
                 disabled={isProcessing || isTesting}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/20 font-semibold text-xs rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                className="flex items-center gap-2 px-3.5 py-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 font-semibold text-xs rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                title="Restart Playit background agent process"
               >
                 {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                 <span>Restart</span>
@@ -357,6 +543,125 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                   Force Recovery
                 </button>
               )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Claim Success Celebration Banner */}
+        {claimSuccessNotice && (
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="p-5 bg-gradient-to-r from-emerald-500/20 via-emerald-500/10 to-card border-2 border-emerald-500/40 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-emerald-500/10"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-foreground font-bold text-sm flex items-center gap-2">
+                  <span>Playit Agent Claimed & Connected!</span>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full font-bold">Online</span>
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Playit tunnel live ho chuki hai. Niche diye gaye public IP se players directly connect kar sakte hain.
+                </p>
+                {publicAddress && (
+                  <div className="mt-2 font-mono text-xs font-bold text-emerald-300 bg-background/80 px-3 py-1.5 rounded-xl border border-emerald-500/30 inline-flex items-center gap-2">
+                    <span>{publicAddress}</span>
+                    <button
+                      onClick={() => copyToClipboard(publicAddress)}
+                      className="hover:text-white transition-colors"
+                      title="Copy Public IP"
+                    >
+                      {copiedAddr ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setClaimSuccessNotice(false)}
+              className="px-3.5 py-1.5 bg-muted hover:bg-muted-hover text-muted-foreground text-xs font-semibold rounded-xl self-end sm:self-center transition-colors"
+            >
+              Dismiss
+            </button>
+          </motion.div>
+        )}
+
+        {/* Claim Link Alert if unlinked / newly generated */}
+        {claimLink && (
+          <motion.div
+            initial={{ scale: 0.98, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="p-5 bg-gradient-to-r from-theme-600/20 via-theme-500/10 to-card border-2 border-theme-500/40 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-5 shadow-lg shadow-theme-500/5"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-theme-500/20 border border-theme-500/30 flex items-center justify-center shrink-0 text-theme-400">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-foreground font-bold text-sm">
+                    New Playit Agent Ready to Claim!
+                  </h3>
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                    Waiting for Claim
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground max-w-xl leading-relaxed">
+                  Apne Playit.gg account par is agent ko claim karein taaki Minecraft port tunnel connect ho sake. Claim complete hone ke baad tunnel automatically connect ho jayegi.
+                </p>
+                <div className="flex items-center gap-2 font-mono text-[11px] text-theme-300 bg-background/60 px-2.5 py-1.5 rounded-xl border border-border-subtle w-fit flex-wrap">
+                  <span className="truncate max-w-xs">{claimLink}</span>
+                  <button
+                    onClick={() => copyToClipboard(claimLink, true)}
+                    className="p-1 hover:text-white transition-colors rounded hover:bg-muted"
+                    title="Copy claim link"
+                  >
+                    {copiedClaim ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+              <a
+                href={claimLink}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-theme-600 hover:bg-theme-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95 text-center"
+              >
+                <span>Claim on Playit.gg</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+
+              <button
+                onClick={handleVerifyClaimNow}
+                disabled={isVerifyingClaim || isProcessing}
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-muted hover:bg-muted-hover text-foreground border border-border-subtle font-bold text-xs rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                title="Check if agent claim has completed and connect tunnel"
+              >
+                {isVerifyingClaim ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-theme-400" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 text-theme-400" />
+                )}
+                <span>Check Status</span>
+              </button>
+
+              <button
+                onClick={requestNewTunnel}
+                disabled={isProcessing}
+                className="flex items-center justify-center gap-1 px-3 py-2.5 text-xs text-muted-foreground hover:text-red-400 font-semibold rounded-xl hover:bg-red-500/10 transition-colors"
+                title="Purana claim link cancel karke naya tunnel create karein"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset / New</span>
+              </button>
             </div>
           </motion.div>
         )}
@@ -411,7 +716,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
           <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Globe className="w-4 h-4 text-theme-500" /> Public Tunnel
+                <Globe className="w-4 h-4 text-theme-500" /> Public Ingress
               </span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-foreground">
                 Playit.gg
@@ -420,7 +725,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
 
             <div className="space-y-2 pt-1">
               <div className="text-xs">
-                <span className="text-muted-foreground block mb-1">Public Ingress Address:</span>
+                <span className="text-muted-foreground block mb-1">Public Server IP:</span>
                 {publicAddress ? (
                   <div className="flex items-center justify-between gap-2 p-2 bg-muted rounded-xl border border-border-subtle">
                     <span className="font-mono text-xs font-bold text-theme-400 truncate select-all">
@@ -435,148 +740,143 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground italic">
-                    {claimLink ? "Claim link generated below" : "Tunnel not active"}
+                  <span className="text-xs text-muted-foreground italic block p-1">
+                    {claimLink ? "Claim link generated above" : "Tunnel not active"}
                   </span>
                 )}
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Agent Status:</span>
+                <span className="text-muted-foreground">Process State:</span>
                 <span className="font-semibold text-foreground capitalize">{status}</span>
               </div>
             </div>
           </div>
 
-          {/* Card 3: Auto-Recovery Health Diagnostics */}
+          {/* Card 3: Active Agent & Secret Status */}
           <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Activity className="w-4 h-4 text-theme-500" /> Recovery Policy
+                <Key className="w-4 h-4 text-theme-500" /> Active Agent Secret
               </span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-foreground">
-                Auto-Heal
-              </span>
+              {activeProfile ? (
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-theme-500/10 text-theme-400 border border-theme-500/20 truncate max-w-[120px]">
+                  {activeProfile.name}
+                </span>
+              ) : (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                  {secretInfo.isConfigured ? "Direct TOML" : "Unclaimed"}
+                </span>
+              )}
             </div>
 
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Recovery Attempts:</span>
-                <span className="font-semibold text-foreground">
-                  {healthData?.recoveryAttemptCount || 0} / 3
+                <span className="text-muted-foreground">Configured Key:</span>
+                <span className="font-mono text-xs font-semibold text-foreground">
+                  {secretInfo.maskedKey || "None (Fresh Setup)"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Last Successful Check:</span>
-                <span className="font-semibold text-foreground truncate max-w-[140px]">
-                  {healthData?.lastSuccessfulCheck
-                    ? new Date(healthData.lastSuccessfulCheck).toLocaleTimeString()
-                    : "None recorded"}
+                <span className="text-muted-foreground">Saved Profiles:</span>
+                <span className="font-semibold text-foreground flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-theme-500" />
+                  {savedAgents.length} available
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Next Scheduled Run:</span>
-                <span className="font-semibold text-foreground">5 min interval</span>
+              <div className="flex items-center justify-between pt-1 gap-2 border-t border-border-subtle/60">
+                <button
+                  onClick={requestNewTunnel}
+                  disabled={isProcessing}
+                  className="text-[11px] text-muted-foreground hover:text-red-400 font-semibold flex items-center gap-1 transition-colors"
+                  title="Purana secret delete karke fresh new tunnel connect karein"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Delete & New</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowConnectModal(true);
+                    setConnectTab(savedAgents.length > 0 ? "saved" : "new");
+                  }}
+                  className="text-xs text-theme-400 hover:text-theme-300 font-semibold flex items-center gap-1"
+                >
+                  <span>Manage / Switch</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Claim Link Alert if unlinked */}
-        {claimLink && (
-          <motion.div
-            initial={{ scale: 0.98, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="p-5 bg-gradient-to-r from-theme-600/20 via-theme-600/10 to-transparent border border-theme-600/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
-          >
-            <div>
-              <h3 className="text-foreground font-bold text-sm flex items-center gap-2">
-                <LinkIcon className="w-4 h-4 text-theme-500" /> Playit Account Registration Required
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Link this agent to your Playit.gg dashboard to assign custom domain names and manage routes.
-              </p>
-            </div>
-            <a
-              href={claimLink}
-              target="_blank"
-              rel="noreferrer"
-              className="px-5 py-2.5 bg-theme-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-theme-500 transition-all shrink-0 text-center shadow-md active:scale-95"
-            >
-              Claim Agent on Playit.gg
-            </a>
-          </motion.div>
-        )}
-
         {/* Main Controls Card */}
         <div className="bg-card border border-border-subtle rounded-2xl p-6 shadow-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <h2 className="text-base font-bold text-foreground mb-1">Tunnel Process Control</h2>
+              <h2 className="text-base font-bold text-foreground mb-1 flex items-center gap-2">
+                <span>Tunnel Process & Agent Control</span>
+              </h2>
               <p className="text-xs text-muted-foreground">
-                Manage the background supervisor process and credentials for this server's tunnel.
+                Naya tunnel create karein, purane agent ko reset karein, ya alag alag Playit agents ko ek click me connect karein.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Option: Start / Stop Tunnel */}
               {status !== "running" ? (
                 <button
                   onClick={generateTunnel}
                   disabled={isProcessing || status === "checking"}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-theme-600 hover:bg-theme-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-theme-600 hover:bg-theme-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
                 >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-white" />}
                   <span>Start Tunnel</span>
                 </button>
               ) : (
-                <>
-                  <button
-                    onClick={stopTunnel}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4" />}
-                    <span>Stop Tunnel</span>
-                  </button>
-
-                  {!showResetConfirm ? (
-                    <button
-                      onClick={() => setShowResetConfirm(true)}
-                      disabled={isProcessing}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-muted hover:bg-muted-hover text-muted-foreground hover:text-foreground border border-border-subtle font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      <span>Reset Agent & Secret</span>
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/30 px-3 py-1.5 rounded-xl text-xs">
-                      <span className="text-red-400 font-semibold">Regenerate secret?</span>
-                      <button
-                        onClick={resetTunnel}
-                        disabled={isProcessing}
-                        className="bg-red-600 hover:bg-red-500 text-white font-bold px-2.5 py-1 rounded-lg text-xs transition-all active:scale-95"
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        onClick={() => setShowResetConfirm(false)}
-                        className="bg-muted hover:bg-muted-hover text-muted-foreground px-2 py-1 rounded-lg text-xs transition-all"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  )}
-                </>
+                <button
+                  onClick={stopTunnel}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                  title="Stop Playit background process"
+                >
+                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4 fill-red-400" />}
+                  <span>Stop Tunnel</span>
+                </button>
               )}
+
+              {/* Option 1: New Tunnel (Delete old & create fresh tunnel link) */}
+              <button
+                onClick={requestNewTunnel}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-4 py-2.5 bg-theme-500/10 hover:bg-theme-500/20 text-theme-400 border border-theme-500/30 font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50 shadow-sm"
+                title="Purana agent secret delete karke fresh new tunnel generate karein"
+              >
+                <Sparkles className="w-4 h-4 text-theme-400" />
+                <span>New Tunnel</span>
+              </button>
+
+              {/* Option 2: Connect Agent / Switch Agent Secret */}
+              <button
+                onClick={() => {
+                  setShowConnectModal(true);
+                  setModalFeedback(null);
+                }}
+                disabled={isProcessing}
+                className="flex items-center gap-2 px-4 py-2.5 bg-muted hover:bg-muted-hover text-foreground border border-border-subtle font-bold text-xs uppercase tracking-wider rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                title="Custom agent secret key connect karein ya saved agent profile switch karein"
+              >
+                <Key className="w-4 h-4 text-theme-500" />
+                <span>Connect / Switch Agent</span>
+              </button>
             </div>
           </div>
         </div>
 
         {/* Tabbed View: Terminal Logs & Recovery Audit */}
         <div className="bg-card border border-border-subtle rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-muted/40">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-muted/40 flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveTab("terminal")}
@@ -602,7 +902,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                 }`}
               >
                 <History className="w-3.5 h-3.5" />
-                <span>Recovery Audit Log</span>
+                <span>Recovery & Action Audit</span>
               </button>
             </div>
 
@@ -633,7 +933,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
               <div className="h-[360px] bg-background rounded-xl p-4 font-mono text-[12px] leading-relaxed text-zinc-300 overflow-y-auto whitespace-pre-wrap border border-border-subtle selection:bg-theme-600 selection:text-white">
                 {logs || (
                   <div className="flex items-center justify-center h-full text-muted-foreground italic">
-                    Playit agent is idle. Click 'Start Tunnel' to initialize.
+                    Playit agent is idle. Click 'Start Tunnel' or 'New Tunnel' to initialize.
                   </div>
                 )}
                 <div ref={terminalEndRef} />
@@ -648,7 +948,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                 ) : auditLogs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 text-xs">
                     <Info className="w-5 h-5 text-muted-foreground/60" />
-                    <span>No recovery or restart events recorded yet.</span>
+                    <span>No recovery or action events recorded yet.</span>
                   </div>
                 ) : (
                   auditLogs.map((entry) => (
@@ -663,7 +963,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                               entry.success ? "bg-emerald-500" : "bg-red-500"
                             }`}
                           />
-                          {entry.action.replace("_", " ").toUpperCase()}
+                          {entry.action.replace(/_/g, " ").toUpperCase()}
                         </span>
                         <span className="text-muted-foreground text-[11px]">
                           {new Date(entry.timestamp).toLocaleString()}
@@ -687,6 +987,319 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
         </div>
       </div>
 
+      {/* MODAL 1: New Tunnel Confirmation (Option 1) */}
+      <AnimatePresence>
+        {showNewTunnelModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border-subtle rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3 text-theme-400">
+                <div className="w-10 h-10 rounded-2xl bg-theme-500/10 border border-theme-500/20 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-theme-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">Create New Tunnel</h3>
+                  <p className="text-xs text-muted-foreground">Delete previous agent & generate new link</p>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-2xl border border-border-subtle text-xs text-muted-foreground space-y-2 leading-relaxed">
+                <p>
+                  Is option se purana <strong>playit.toml</strong> agent secret delete ho jayega aur ek <strong>brand new claim link</strong> generate hoga.
+                </p>
+                <p className="text-theme-400 font-medium">
+                  Aapko Playit.gg par ja kar naye agent ko claim karna hoga taaki naya public tunnel IP connect ho sake.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+                <button
+                  onClick={() => setShowNewTunnelModal(false)}
+                  className="px-4 py-2 bg-muted hover:bg-muted-hover text-muted-foreground text-xs font-semibold rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeNewTunnel}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-2 bg-theme-600 hover:bg-theme-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+                >
+                  {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  <span>Delete Old & Create New Tunnel</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL 2: Connect Agent / Switch Agent Secret (Option 2) */}
+      <AnimatePresence>
+        {showConnectModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-card border border-border-subtle rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-theme-500/10 border border-theme-500/20 flex items-center justify-center text-theme-400">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">Connect / Switch Playit Agent</h3>
+                    <p className="text-xs text-muted-foreground">Ek hi server par alag alag agents link karein</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowConnectModal(false);
+                    setModalFeedback(null);
+                  }}
+                  className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tabs inside modal */}
+              <div className="flex items-center gap-2 p-1 bg-muted rounded-xl border border-border-subtle">
+                <button
+                  onClick={() => {
+                    setConnectTab("new");
+                    setModalFeedback(null);
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    connectTab === "new"
+                      ? "bg-theme-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Connect Secret Key</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setConnectTab("saved");
+                    setModalFeedback(null);
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    connectTab === "saved"
+                      ? "bg-theme-600 text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Saved Agents ({savedAgents.length})</span>
+                </button>
+              </div>
+
+              {/* Feedback Message */}
+              {modalFeedback && (
+                <div
+                  className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                    modalFeedback.type === "success"
+                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                      : "bg-red-500/10 border-red-500/20 text-red-400"
+                  }`}
+                >
+                  {modalFeedback.type === "success" ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span>{modalFeedback.message}</span>
+                </div>
+              )}
+
+              {/* Tab 1: Connect New Secret */}
+              {connectTab === "new" ? (
+                <form onSubmit={handleConnectAgentSubmit} className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-foreground flex items-center gap-1">
+                        <span>Playit Agent Secret Key</span>
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowSecretText(!showSecretText)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      >
+                        {showSecretText ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showSecretText ? "Hide Key" : "Show Key"}</span>
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <input
+                        type={showSecretText ? "text" : "password"}
+                        value={secretInput}
+                        onChange={(e) => setSecretInput(e.target.value)}
+                        placeholder="Paste secret key (e.g. 018f3a... or playit.toml)"
+                        className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-xs text-foreground font-mono placeholder:text-muted-foreground/50 focus:outline-none focus:border-theme-500 transition-colors"
+                        required
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                      Playit.gg dashboard se apna <strong>Agent Secret Key</strong> copy karein (Dashboard &rarr; Agents &rarr; Select Agent &rarr; Settings &rarr; Secret Key).
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-foreground block mb-1.5">
+                      Agent Profile Name (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={agentNameInput}
+                      onChange={(e) => setAgentNameInput(e.target.value)}
+                      placeholder="e.g. Main Survival Agent, EU Proxy, Bedwars Agent"
+                      className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-theme-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="saveProfileCheck"
+                      checked={saveProfileChecked}
+                      onChange={(e) => setSaveProfileChecked(e.target.checked)}
+                      className="rounded border-border-subtle text-theme-600 focus:ring-0"
+                    />
+                    <label htmlFor="saveProfileCheck" className="text-xs text-muted-foreground cursor-pointer select-none">
+                      Save this agent in server library for 1-click switching later
+                    </label>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-subtle">
+                    <button
+                      type="button"
+                      onClick={() => setShowConnectModal(false)}
+                      className="px-4 py-2 bg-muted hover:bg-muted-hover text-muted-foreground text-xs font-semibold rounded-xl transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingSecret || !secretInput.trim()}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-theme-600 hover:bg-theme-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                    >
+                      {isSubmittingSecret ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                      )}
+                      <span>Connect Agent</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* Tab 2: Saved Agents List */
+                <div className="space-y-3">
+                  {savedAgents.length === 0 ? (
+                    <div className="p-8 text-center bg-muted/30 border border-border-subtle rounded-2xl">
+                      <Layers className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                      <p className="text-xs font-semibold text-foreground">No Saved Agents Yet</p>
+                      <p className="text-[11px] text-muted-foreground mt-1 max-w-xs mx-auto">
+                        Aapne is server par koi agent profile save nahi ki. 'Connect Secret Key' tab se naya agent add karein.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                      {savedAgents.map((agent) => {
+                        const isActive =
+                          secretInfo.secretKey &&
+                          agent.secretKey &&
+                          agent.secretKey.trim() === secretInfo.secretKey.trim();
+                        const isSwitching = switchingAgentId === agent.id;
+
+                        return (
+                          <div
+                            key={agent.id}
+                            className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                              isActive
+                                ? "bg-theme-500/10 border-theme-500/40 ring-1 ring-theme-500/20"
+                                : "bg-card hover:bg-muted/40 border-border-subtle"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-foreground truncate">
+                                  {agent.name}
+                                </span>
+                                {isActive && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-theme-500/20 text-theme-400 border border-theme-500/30 shrink-0">
+                                    Active
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] font-mono text-muted-foreground mt-0.5 truncate">
+                                Key: {agent.secretKey ? `${agent.secretKey.substring(0, 6)}••••${agent.secretKey.substring(agent.secretKey.length - 4)}` : "••••"}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!isActive ? (
+                                <button
+                                  onClick={() => handleSwitchAgent(agent)}
+                                  disabled={isSwitching || switchingAgentId !== null}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-theme-600 hover:bg-theme-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                >
+                                  {isSwitching ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <ArrowUpDown className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>Switch</span>
+                                </button>
+                              ) : (
+                                <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 px-2 py-1">
+                                  <Check className="w-3.5 h-3.5" /> Connected
+                                </span>
+                              )}
+
+                              <button
+                                onClick={() => handleDeleteSavedAgent(agent.id)}
+                                className="p-1.5 text-muted-foreground hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                                title="Delete from saved agents"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-border-subtle flex justify-between items-center">
+                    <button
+                      onClick={() => setConnectTab("new")}
+                      className="text-xs text-theme-400 hover:text-theme-300 font-semibold flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Another Agent</span>
+                    </button>
+                    <button
+                      onClick={() => setShowConnectModal(false)}
+                      className="px-4 py-2 bg-muted hover:bg-muted-hover text-muted-foreground text-xs font-semibold rounded-xl transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Safety Warning Modal for Active Players */}
       <AnimatePresence>
         {playerWarningModal.isOpen && (
@@ -695,7 +1308,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-card border border-border-subtle rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+              className="bg-card border border-border-subtle rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4"
             >
               <div className="flex items-center gap-3 text-amber-500">
                 <AlertTriangle className="w-6 h-6 flex-shrink-0" />
@@ -704,7 +1317,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
 
               <p className="text-xs text-muted-foreground leading-relaxed">
                 There are currently <strong className="text-foreground">{playerCount} active player(s)</strong> connected to this server.
-                Restarting the Playit tunnel will temporarily drop active player connections and require them to reconnect.
+                Modifying or switching the Playit tunnel will temporarily drop active player connections and require them to reconnect.
               </p>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
@@ -718,13 +1331,17 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
                   onClick={() => {
                     if (playerWarningModal.action === "force_recover") {
                       executeForceRecover();
+                    } else if (playerWarningModal.action === "new_tunnel") {
+                      executeNewTunnel();
+                    } else if (playerWarningModal.action === "switch_agent" && playerWarningModal.targetAgentId) {
+                      executeSwitchAgent(playerWarningModal.targetAgentId);
                     } else {
                       executeRestart(true);
                     }
                   }}
                   className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
                 >
-                  Proceed with Restart
+                  Proceed Anyway
                 </button>
               </div>
             </motion.div>

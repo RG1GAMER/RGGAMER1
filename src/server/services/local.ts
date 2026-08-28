@@ -22,101 +22,120 @@ export const resolveJavaBinary = async (serverData?: any, onLog?: (msg: string) 
     return process.env.JAVA_BIN;
   }
 
+  const isWindows = process.platform === "win32";
+  const exeSuffix = isWindows ? ".exe" : "";
+
   // Determine target Java major version (8, 11, 16, 17, 21, 25)
   const targetVer = resolveJavaMajorVersion(serverData?.version, serverData?.type, serverData?.javaVersion) || "25";
 
   // 1. Check portable JRE in workspace .data/bin/jre-${targetVer}
-  const localPortableJava = path.join(process.cwd(), ".data", "bin", `jre-${targetVer}`, "bin", "java");
+  const localPortableJava = path.join(process.cwd(), ".data", "bin", `jre-${targetVer}`, "bin", `java${exeSuffix}`);
   if (await fs.pathExists(localPortableJava)) {
     return localPortableJava;
   }
 
-  // 2. Check system candidates for this target Java version
-  const candidates = [
-    `/usr/lib/jvm/java-${targetVer}-openjdk-amd64/bin/java`,
-    `/usr/lib/jvm/java-${targetVer}-openjdk-arm64/bin/java`,
-    `/usr/lib/jvm/java-${targetVer}-openjdk/bin/java`,
-    `/usr/lib/jvm/java-${targetVer}/bin/java`,
-    `/usr/lib/jvm/temurin-${targetVer}-jdk-amd64/bin/java`,
-    `/usr/lib/jvm/temurin-${targetVer}-jre-amd64/bin/java`,
-    `/opt/java/openjdk-${targetVer}/bin/java`,
-    `/usr/lib/jvm/java-25-openjdk-amd64/bin/java`,
-    `/usr/lib/jvm/java-25-openjdk/bin/java`,
-    `/usr/lib/jvm/java-21-openjdk-amd64/bin/java`,
-    `/usr/lib/jvm/java-17-openjdk-amd64/bin/java`,
-    `/usr/lib/jvm/default-java/bin/java`,
-    "/usr/bin/java",
-    "/usr/local/bin/java",
-    "java"
-  ];
+  // 2. Check system candidates for this target Java version (Linux, Mac, Windows)
+  const candidates = isWindows
+    ? [
+        `C:\\Program Files\\Eclipse Adoptium\\jdk-${targetVer}\\bin\\java.exe`,
+        `C:\\Program Files\\Java\\jdk-${targetVer}\\bin\\java.exe`,
+        `C:\\Program Files\\Java\\jre-${targetVer}\\bin\\java.exe`,
+        `C:\\Program Files\\Eclipse Adoptium\\jre-${targetVer}\\bin\\java.exe`,
+        `C:\\Program Files\\Microsoft\\jdk-${targetVer}\\bin\\java.exe`,
+        `C:\\Program Files\\Java\\jdk-21\\bin\\java.exe`,
+        `C:\\Program Files\\Java\\jdk-17\\bin\\java.exe`,
+        "java.exe",
+        "java"
+      ]
+    : [
+        `/usr/lib/jvm/java-${targetVer}-openjdk-amd64/bin/java`,
+        `/usr/lib/jvm/java-${targetVer}-openjdk-arm64/bin/java`,
+        `/usr/lib/jvm/java-${targetVer}-openjdk/bin/java`,
+        `/usr/lib/jvm/java-${targetVer}/bin/java`,
+        `/usr/lib/jvm/temurin-${targetVer}-jdk-amd64/bin/java`,
+        `/usr/lib/jvm/temurin-${targetVer}-jre-amd64/bin/java`,
+        `/opt/java/openjdk-${targetVer}/bin/java`,
+        `/usr/lib/jvm/java-25-openjdk-amd64/bin/java`,
+        `/usr/lib/jvm/java-25-openjdk/bin/java`,
+        `/usr/lib/jvm/java-21-openjdk-amd64/bin/java`,
+        `/usr/lib/jvm/java-17-openjdk-amd64/bin/java`,
+        `/usr/lib/jvm/default-java/bin/java`,
+        "/usr/bin/java",
+        "/usr/local/bin/java",
+        "java"
+      ];
+
   for (const cand of candidates) {
-    if (cand === "java") {
+    if (cand === "java" || cand === "java.exe") {
       try {
-        await execAsync("which java");
-        return "java";
+        const cmd = isWindows ? "where java" : "which java";
+        await execAsync(cmd);
+        return cand;
       } catch (e) {}
     } else if (await fs.pathExists(cand)) {
       return cand;
     }
   }
 
-  // 3. Automatically download and extract Temurin OpenJDK ${targetVer} if missing on host
-  try {
-    const binDir = path.join(process.cwd(), ".data", "bin");
-    const jreDir = path.join(binDir, `jre-${targetVer}`);
-    const tarPath = path.join(binDir, `jre-${targetVer}.tar.gz`);
+  // 3. Automatically download and extract Temurin OpenJDK ${targetVer} if missing on host (Linux/Unix)
+  if (!isWindows) {
+    try {
+      const binDir = path.join(process.cwd(), ".data", "bin");
+      const jreDir = path.join(binDir, `jre-${targetVer}`);
+      const tarPath = path.join(binDir, `jre-${targetVer}.tar.gz`);
 
-    if (onLog) onLog(`Java ${targetVer} runtime not found on host. Automatically provisioning OpenJDK ${targetVer} runtime...`);
-    await fs.ensureDir(binDir);
+      if (onLog) onLog(`Java ${targetVer} runtime not found on host. Automatically provisioning OpenJDK ${targetVer} runtime...`);
+      await fs.ensureDir(binDir);
 
-    const endpoints = [
-      `https://api.adoptium.net/v3/binary/latest/${targetVer}/ga/linux/x64/jre/hotspot/normal/eclipse`,
-      `https://api.adoptium.net/v3/binary/latest/${targetVer}/ga/linux/x64/jdk/hotspot/normal/eclipse`,
-      `https://api.adoptium.net/v3/binary/latest/${targetVer}/ea/linux/x64/jdk/hotspot/normal/eclipse`,
-      `https://api.adoptium.net/v3/binary/latest/${targetVer}/ea/linux/x64/jre/hotspot/normal/eclipse`
-    ];
+      const endpoints = [
+        `https://api.adoptium.net/v3/binary/latest/${targetVer}/ga/linux/x64/jre/hotspot/normal/eclipse`,
+        `https://api.adoptium.net/v3/binary/latest/${targetVer}/ga/linux/x64/jdk/hotspot/normal/eclipse`,
+        `https://api.adoptium.net/v3/binary/latest/${targetVer}/ea/linux/x64/jdk/hotspot/normal/eclipse`,
+        `https://api.adoptium.net/v3/binary/latest/${targetVer}/ea/linux/x64/jre/hotspot/normal/eclipse`
+      ];
 
-    let downloadStream = null;
-    for (const ep of endpoints) {
-      try {
-        const res = await axios({
-          method: "GET",
-          url: ep,
-          responseType: "stream",
-          maxRedirects: 5,
-          timeout: 60000
-        });
-        if (res.status === 200) {
-          downloadStream = res.data;
-          break;
-        }
-      } catch (e) {}
+      let downloadStream = null;
+      for (const ep of endpoints) {
+        try {
+          const res = await axios({
+            method: "GET",
+            url: ep,
+            responseType: "stream",
+            maxRedirects: 5,
+            timeout: 60000
+          });
+          if (res.status === 200) {
+            downloadStream = res.data;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (!downloadStream) {
+        throw new Error(`Adoptium release binary not found for Java ${targetVer}`);
+      }
+
+      const writer = fs.createWriteStream(tarPath);
+      downloadStream.pipe(writer);
+
+      await new Promise<void>((resolve, reject) => {
+        writer.on("finish", resolve);
+        writer.on("error", reject);
+      });
+
+      await fs.ensureDir(jreDir);
+      await execAsync(`tar -xzf "${tarPath}" -C "${jreDir}" --strip-components=1`);
+      await fs.remove(tarPath).catch(() => {});
+      await execAsync(`chmod +x "${localPortableJava}"`);
+
+      if (onLog) onLog(`OpenJDK ${targetVer} runtime provisioned successfully.`);
+      return localPortableJava;
+    } catch (err: any) {
+      if (onLog) onLog(`Auto-provisioning JRE ${targetVer} encountered: ${err.message}. Defaulting to 'java'.`);
     }
-
-    if (!downloadStream) {
-      throw new Error(`Adoptium release binary not found for Java ${targetVer}`);
-    }
-
-    const writer = fs.createWriteStream(tarPath);
-    downloadStream.pipe(writer);
-
-    await new Promise<void>((resolve, reject) => {
-      writer.on("finish", resolve);
-      writer.on("error", reject);
-    });
-
-    await fs.ensureDir(jreDir);
-    await execAsync(`tar -xzf "${tarPath}" -C "${jreDir}" --strip-components=1`);
-    await fs.remove(tarPath).catch(() => {});
-    await execAsync(`chmod +x "${localPortableJava}"`);
-
-    if (onLog) onLog(`OpenJDK ${targetVer} runtime provisioned successfully.`);
-    return localPortableJava;
-  } catch (err: any) {
-    if (onLog) onLog(`Auto-provisioning JRE ${targetVer} encountered: ${err.message}. Defaulting to 'java'.`);
   }
 
-  return process.env.JAVA_BIN || "java";
+  return process.env.JAVA_BIN || (isWindows ? "java.exe" : "java");
 };
 
 export const resolvePythonBinary = async (): Promise<string> => {
@@ -441,9 +460,12 @@ export const startLocalServer = async (id: string, serverData: any) => {
   }
 
   processes.set(id, child);
+  localStartedAt.set(id, new Date().toISOString());
 
   child.on("spawn", () => {
-    localStartedAt.set(id, new Date().toISOString());
+    if (!localStartedAt.has(id)) {
+      localStartedAt.set(id, new Date().toISOString());
+    }
     logMessage(`Server process started with PID ${child.pid} for ${serverData.name || id} (${type})`);
   });
 
@@ -513,7 +535,18 @@ export const deleteLocalServer = async (id: string) => {
 };
 
 export const getLocalServerStatus = async (id: string) => {
-  const isRunning = processes.has(id);
+  const child = processes.get(id);
+  let isRunning = false;
+  if (child && child.pid && !child.killed) {
+    try {
+      process.kill(child.pid, 0);
+      isRunning = true;
+    } catch {
+      isRunning = false;
+      processes.delete(id);
+      localStartedAt.delete(id);
+    }
+  }
   return {
     State: {
       Running: isRunning,

@@ -74,8 +74,8 @@ router.post("/:id/reinstall", redownloadJar);
 // Simple file endpoints with upload limits & error handler
 router.get("/:id/files", getFiles);
 router.get("/:id/files/download", downloadFile);
-router.post("/:id/files/upload", upload.single("file"), handleUploadError, uploadFile);
-router.post("/:id/files/upload-chunk", upload.single("chunk"), handleUploadError, uploadChunk);
+router.post("/:id/files/upload", upload.single("file") as any, handleUploadError, uploadFile);
+router.post("/:id/files/upload-chunk", upload.single("chunk") as any, handleUploadError, uploadChunk);
 router.post("/:id/files/upload-complete", completeUpload);
 router.post("/:id/files/rename", renameFile);
 router.post("/:id/files/save", saveFileContent);
@@ -114,6 +114,11 @@ import {
   startPlayitAgent,
   stopPlayitAgent,
   resetPlayitAgent,
+  setPlayitAgentSecret,
+  getPlayitAgentSecret,
+  getSavedPlayitAgents,
+  savePlayitAgentProfile,
+  deleteSavedPlayitAgentProfile,
   runServerPlayitHealthCheck,
   getHealthRecords,
   addPlayitAudit,
@@ -139,6 +144,8 @@ router.get("/:id/playit", async (req, res) => {
     const healthRecords = await getHealthRecords();
     const serverHealth = healthRecords[id] || null;
     const playerCount = getTrackedPlayerCount(id);
+    const secretInfo = await getPlayitAgentSecret(server);
+    const savedAgents = await getSavedPlayitAgents(id);
 
     res.json({
       status: agentInfo.status,
@@ -146,7 +153,9 @@ router.get("/:id/playit", async (req, res) => {
       publicAddress: agentInfo.publicAddress || serverHealth?.playitPublicAddress || null,
       logs: agentInfo.logs,
       health: serverHealth,
-      playerCount
+      playerCount,
+      secretInfo,
+      savedAgents
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch Playit status", details: err.message });
@@ -254,9 +263,193 @@ router.post("/:id/playit/reset", async (req, res) => {
       success: true
     });
 
+    // Schedule quick health test
+    setTimeout(() => {
+      runServerPlayitHealthCheck(id, {
+        isManualTrigger: true,
+        triggerUser: user.username || user.email || "Admin"
+      }).catch(console.error);
+    }, 4000);
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to reset Playit agent", details: err.message });
+  }
+});
+
+// Connect specific Agent Secret Key
+router.post("/:id/playit/connect-agent", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id } = req.params;
+  const { secretKey, agentName, saveProfile } = req.body || {};
+
+  if (!secretKey || typeof secretKey !== "string" || !secretKey.trim()) {
+    return res.status(400).json({ error: "Agent secret key is required." });
+  }
+
+  try {
+    const serversJSON = await (await import("fs/promises")).readFile(path.join(process.cwd(), ".data", "servers.json"), "utf8");
+    const servers = JSON.parse(serversJSON);
+    const server = servers.find((s: any) => s.id === id);
+    if (!server) return res.status(404).json({ error: "Server not found" });
+
+    const result = await setPlayitAgentSecret(server, secretKey.trim());
+    if (!result.success) {
+      return res.status(500).json({ error: "Failed to connect Playit Agent", details: result.error });
+    }
+
+    if (saveProfile && agentName) {
+      await savePlayitAgentProfile(id, {
+        name: agentName.trim(),
+        secretKey: secretKey.trim(),
+        notes: `Connected by ${user.username || "Admin"} on ${new Date().toLocaleDateString()}`
+      });
+    }
+
+    await addPlayitAudit({
+      serverId: id,
+      serverName: server.name || id,
+      action: "agent_connect",
+      trigger: "user_action",
+      performedBy: user.username || user.email || "Admin",
+      previousStatus: "unknown",
+      newStatus: "recovering",
+      playerCount: getTrackedPlayerCount(id),
+      reason: `User connected custom Playit Agent (${agentName || "Custom Secret"}).`,
+      success: true
+    });
+
+    // Schedule health check in 4 seconds
+    setTimeout(() => {
+      runServerPlayitHealthCheck(id, {
+        isManualTrigger: true,
+        triggerUser: user.username || user.email || "Admin"
+      }).catch(console.error);
+    }, 4000);
+
+    const savedAgents = await getSavedPlayitAgents(id);
+    const secretInfo = await getPlayitAgentSecret(server);
+
+    res.json({ success: true, savedAgents, secretInfo });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to connect Playit agent", details: err.message });
+  }
+});
+
+// Get Saved Agent Profiles
+router.get("/:id/playit/saved-agents", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id } = req.params;
+  try {
+    const savedAgents = await getSavedPlayitAgents(id);
+    res.json({ savedAgents });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load saved agents", details: err.message });
+  }
+});
+
+// Save or Update an Agent Profile
+router.post("/:id/playit/saved-agents", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id } = req.params;
+  const { id: profileId, name, secretKey, notes } = req.body || {};
+
+  if (!name || !secretKey) {
+    return res.status(400).json({ error: "Agent name and secret key are required." });
+  }
+
+  try {
+    const updatedAgents = await savePlayitAgentProfile(id, {
+      id: profileId,
+      name,
+      secretKey,
+      notes
+    });
+    res.json({ success: true, savedAgents: updatedAgents });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to save agent profile", details: err.message });
+  }
+});
+
+// Delete a Saved Agent Profile
+router.delete("/:id/playit/saved-agents/:agentId", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id, agentId } = req.params;
+  try {
+    const updatedAgents = await deleteSavedPlayitAgentProfile(id, agentId);
+    res.json({ success: true, savedAgents: updatedAgents });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to delete agent profile", details: err.message });
+  }
+});
+
+// Switch to a Saved Agent Profile
+router.post("/:id/playit/switch-agent", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id } = req.params;
+  const { agentId } = req.body || {};
+
+  try {
+    const savedAgents = await getSavedPlayitAgents(id);
+    const targetAgent = savedAgents.find((a) => a.id === agentId);
+    if (!targetAgent) {
+      return res.status(404).json({ error: "Saved agent profile not found" });
+    }
+
+    const serversJSON = await (await import("fs/promises")).readFile(path.join(process.cwd(), ".data", "servers.json"), "utf8");
+    const servers = JSON.parse(serversJSON);
+    const server = servers.find((s: any) => s.id === id);
+    if (!server) return res.status(404).json({ error: "Server not found" });
+
+    const result = await setPlayitAgentSecret(server, targetAgent.secretKey);
+    if (!result.success) {
+      return res.status(500).json({ error: "Failed to switch agent", details: result.error });
+    }
+
+    // Update lastUsedAt timestamp
+    await savePlayitAgentProfile(id, {
+      id: targetAgent.id,
+      name: targetAgent.name,
+      secretKey: targetAgent.secretKey,
+      notes: targetAgent.notes
+    });
+
+    await addPlayitAudit({
+      serverId: id,
+      serverName: server.name || id,
+      action: "agent_switch",
+      trigger: "user_action",
+      performedBy: user.username || user.email || "Admin",
+      previousStatus: "unknown",
+      newStatus: "recovering",
+      playerCount: getTrackedPlayerCount(id),
+      reason: `User switched server to Playit Agent "${targetAgent.name}".`,
+      success: true
+    });
+
+    setTimeout(() => {
+      runServerPlayitHealthCheck(id, {
+        isManualTrigger: true,
+        triggerUser: user.username || user.email || "Admin"
+      }).catch(console.error);
+    }, 4000);
+
+    const secretInfo = await getPlayitAgentSecret(server);
+    const updatedAgents = await getSavedPlayitAgents(id);
+
+    res.json({ success: true, secretInfo, savedAgents: updatedAgents });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to switch agent profile", details: err.message });
   }
 });
 

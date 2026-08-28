@@ -29,6 +29,13 @@ import {
   secureExecutablePermissions,
   secureChmod
 } from "../utils/permissions.js";
+import {
+  startPlayitAgent,
+  stopPlayitAgent,
+  runServerPlayitHealthCheck,
+  addPlayitAudit,
+  getTrackedPlayerCount
+} from "../services/playitHealth.js";
 
 export const getServers = async (req: Request, res: Response) => {
   const user = (req as any).user;
@@ -73,7 +80,7 @@ export const getServer = async (req: Request, res: Response) => {
   }
 
   const status = await getServerRuntimeStatus(server);
-  const isRunning = !!status?.State?.Running;
+  const isRunning = !!status?.State?.Running || server.status === "online";
   server.status = isRunning ? "online" : "offline";
   server.startedAt = isRunning ? (status?.State?.StartedAt || server.startedAt || new Date().toISOString()) : null;
   if (server.runtimeType === 'local') {
@@ -101,8 +108,8 @@ export const getServerStats = async (req: Request, res: Response) => {
   }
 
   const status = await getServerRuntimeStatus(server);
-  const isRunning = !!status?.State?.Running;
-  const startedAt = isRunning ? (status?.State?.StartedAt || server.startedAt || null) : null;
+  const isRunning = !!status?.State?.Running || server.status === "online";
+  const startedAt = isRunning ? (status?.State?.StartedAt || server.startedAt || new Date().toISOString()) : null;
   let uptimeSeconds = 0;
   if (isRunning && startedAt) {
     const startedMs = new Date(startedAt).getTime();
@@ -441,6 +448,7 @@ export const deleteServer = async (req: Request, res: Response) => {
 export const startServer = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const user = (req as any).user;
     const servers = await readJSON("servers.json") || [];
     
     const server = servers.find((s: any) => s.id === id);
@@ -562,6 +570,38 @@ export const startServer = async (req: Request, res: Response) => {
       }
     }
     await attachServerRuntimeSocket(server, server.id);
+
+    // Automatically start Playit tunnel agent alongside server startup
+    try {
+      startPlayitAgent(server).then(async (result) => {
+        if (result.success) {
+          console.log(`[Playit] Auto-started Playit agent on server startup for ${server.id} (${server.name})`);
+          await addPlayitAudit({
+            serverId: id,
+            serverName: server.name || id,
+            action: "agent_start",
+            trigger: "user_action",
+            performedBy: user?.username || user?.email || "System Auto-Start",
+            previousStatus: "agent_offline",
+            newStatus: "recovering",
+            playerCount: getTrackedPlayerCount(id),
+            reason: "Automatically started Playit tunnel agent alongside server start.",
+            success: true
+          });
+          setTimeout(() => {
+            runServerPlayitHealthCheck(id, {
+              isManualTrigger: false,
+              triggerUser: "System Auto-Start"
+            }).catch(() => {});
+          }, 5000);
+        }
+      }).catch((err) => {
+        console.warn(`[Playit] Auto-start agent notice for ${server.id}:`, err?.message || err);
+      });
+    } catch (playitErr) {
+      console.warn(`[Playit] Exception during auto-start Playit agent:`, playitErr);
+    }
+
     res.json({ success: true, startedAt: server.startedAt });
   } catch (err: any) {
     console.error("Start server error:", err);
@@ -572,6 +612,7 @@ export const startServer = async (req: Request, res: Response) => {
 export const stopServer = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const user = (req as any).user;
     const servers = await readJSON("servers.json") || [];
     const server = servers.find((s: any) => s.id === id);
     if (!server || !server.containerId) {
@@ -589,6 +630,14 @@ export const stopServer = async (req: Request, res: Response) => {
     server.status = "offline";
     server.startedAt = null;
     await writeJSON("servers.json", servers);
+
+    // Automatically stop Playit tunnel agent when server is stopped
+    try {
+      stopPlayitAgent(server).catch((e) => console.warn(`[Playit] Auto-stop error:`, e));
+    } catch (playitErr) {
+      console.warn(`[Playit] Auto-stop exception:`, playitErr);
+    }
+
     res.json({ success: true });
   } catch (err: any) {
     console.error("Stop server error:", err);
@@ -599,6 +648,7 @@ export const stopServer = async (req: Request, res: Response) => {
 export const restartServer = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const user = (req as any).user;
     const servers = await readJSON("servers.json") || [];
     const server = servers.find((s: any) => s.id === id);
     if (!server || !server.containerId) {
@@ -625,6 +675,38 @@ export const restartServer = async (req: Request, res: Response) => {
       }
     }
     await attachServerRuntimeSocket(server, server.id);
+
+    // Automatically start / restart Playit tunnel agent alongside server restart
+    try {
+      startPlayitAgent(server).then(async (result) => {
+        if (result.success) {
+          console.log(`[Playit] Auto-started Playit agent on server restart for ${server.id} (${server.name})`);
+          await addPlayitAudit({
+            serverId: id,
+            serverName: server.name || id,
+            action: "manual_restart",
+            trigger: "user_action",
+            performedBy: user?.username || user?.email || "System Auto-Start",
+            previousStatus: "agent_offline",
+            newStatus: "recovering",
+            playerCount: getTrackedPlayerCount(id),
+            reason: "Automatically restarted Playit tunnel agent alongside server restart.",
+            success: true
+          });
+          setTimeout(() => {
+            runServerPlayitHealthCheck(id, {
+              isManualTrigger: false,
+              triggerUser: "System Auto-Start"
+            }).catch(() => {});
+          }, 5000);
+        }
+      }).catch((err) => {
+        console.warn(`[Playit] Auto-restart agent notice for ${server.id}:`, err?.message || err);
+      });
+    } catch (playitErr) {
+      console.warn(`[Playit] Exception during auto-start Playit agent on restart:`, playitErr);
+    }
+
     res.json({ success: true, startedAt: server.startedAt });
   } catch (err: any) {
     console.error("Restart server error:", err);

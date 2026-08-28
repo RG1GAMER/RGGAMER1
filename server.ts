@@ -100,22 +100,51 @@ io.on("connection", (socket) => {
   });
 });
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const PORT = 3000;
 
 // Enforce reasonable JSON & URL-encoded payload limits (50MB max for structured data)
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cors(corsOptions));
 
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
 import apiRoutes from "./src/server/routes/api.js";
 app.use("/api", apiRoutes);
 
 import { initSFTPServer } from "./src/server/services/sftp.js";
 import { startPlayitHealthMonitor } from "./src/server/services/playitHealth.js";
+import { detectEnvironment } from "./src/server/services/environmentDetector.js";
 
 async function startServer() {
-  await initSFTPServer();
-  await startPlayitHealthMonitor();
+  try {
+    const envInfo = await detectEnvironment();
+    console.log("==================================================");
+    console.log(`🚀 JTG Panel Host Environment Auto-Detected:`);
+    console.log(`   Type: ${envInfo.environmentName} [${envInfo.environmentBadge}]`);
+    console.log(`   Platform: ${envInfo.distro || envInfo.platform} (${envInfo.arch}) | Cores: ${envInfo.hardware.cpuCores} | RAM: ${envInfo.hardware.totalMemoryGB} GB`);
+    console.log(`   Recommended Runtime: ${envInfo.recommendedRuntime.toUpperCase()}`);
+    console.log(`   Docker Engine: ${envInfo.capabilities.dockerAvailable ? `Available (${envInfo.capabilities.dockerVersion || 'Yes'})` : 'Not Detected (Using Native High-Performance Local Process)'}`);
+    console.log(`   Java: ${envInfo.capabilities.javaAvailable ? envInfo.capabilities.javaVersion : 'Adoptium JRE Auto-Installer Active'}`);
+    console.log(`   Local IP: ${envInfo.capabilities.localIp || '127.0.0.1'} | Public IP: ${envInfo.capabilities.publicIp || 'Auto-tunnel ready'}`);
+    console.log("==================================================");
+  } catch (envErr) {
+    console.warn("[Env Auto-Detect] Notice:", envErr);
+  }
+
+  try {
+    await initSFTPServer();
+  } catch (err: any) {
+    console.warn("[SFTP Init] Warning:", err?.message || err);
+  }
+
+  try {
+    await startPlayitHealthMonitor();
+  } catch (err: any) {
+    console.warn("[Playit Init] Warning:", err?.message || err);
+  }
 
   const isProduction = process.env.NODE_ENV === "production" || process.argv[1]?.includes('server.cjs');
 
@@ -138,26 +167,6 @@ async function startServer() {
   });
 }
 
-
-
-
-// Only start server if not imported as a module in tests
-const isMain = 
-  (typeof require !== 'undefined' && require.main === module) || 
-  (process.argv.some(arg => arg.includes('server.ts') || arg.includes('server.cjs'))) ||
-  (process.env.pm_id !== undefined);
-
-if (isMain) {
-  startServer();
-}
-
-
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION:', err);
-  fs.writeFileSync('crash.log', String(err.stack));
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('UNHANDLED REJECTION:', reason);
-  fs.writeFileSync('crash.log', String(reason));
+startServer().catch((err) => {
+  console.error("Fatal startup error:", err);
 });

@@ -14,6 +14,8 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   const [enableLoginAnimation, setEnableLoginAnimation] = useState<boolean>(true);
   const [enableRegistration, setEnableRegistration] = useState<boolean>(true);
   const [theme, setTheme] = useState<string>("red");
+  const [buttonColor, setButtonColor] = useState<string>("theme");
+  const [uiTheme, setUiTheme] = useState<string>("dark");
   const [enableGoogleLogin, setEnableGoogleLogin] = useState<boolean>(false);
   const [firebaseApiKey, setFirebaseApiKey] = useState<string>("");
   const [firebaseAuthDomain, setFirebaseAuthDomain] = useState<string>("");
@@ -23,6 +25,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   const [firebaseAppId, setFirebaseAppId] = useState<string>("");
   const [defaultRuntime, setDefaultRuntime] = useState<string>("docker");
   const [runtimeLocked, setRuntimeLocked] = useState<boolean>(false);
+  const [environment, setEnvironment] = useState<any>(null);
   const [isDev, setIsDev] = useState<boolean>(false);
   const [playitServiceMode, setPlayitServiceMode] = useState<string>("managed_process");
   const [playitServiceName, setPlayitServiceName] = useState<string>("playit");
@@ -51,6 +54,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       if (res.data.firebaseAppId !== undefined) setFirebaseAppId(res.data.firebaseAppId);
       if (res.data.defaultRuntime !== undefined) setDefaultRuntime(res.data.defaultRuntime);
       if (res.data.runtimeLocked !== undefined) setRuntimeLocked(res.data.runtimeLocked);
+      if (res.data.environment !== undefined) setEnvironment(res.data.environment);
       if (res.data.isDev !== undefined) setIsDev(res.data.isDev);
       if (res.data.playitServiceMode !== undefined) setPlayitServiceMode(res.data.playitServiceMode);
       if (res.data.playitServiceName !== undefined) setPlayitServiceName(res.data.playitServiceName);
@@ -63,6 +67,18 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
         document.documentElement.setAttribute("data-theme", res.data.theme || "red");
       } else {
         document.documentElement.setAttribute("data-theme", "red");
+      }
+      if (res.data.buttonColor !== undefined) {
+        setButtonColor(res.data.buttonColor);
+        document.documentElement.setAttribute("data-button-color", res.data.buttonColor || "theme");
+      } else {
+        document.documentElement.setAttribute("data-button-color", "theme");
+      }
+      if (res.data.uiTheme !== undefined) {
+        setUiTheme(res.data.uiTheme);
+        document.documentElement.setAttribute("data-ui-theme", res.data.uiTheme || "dark");
+      } else {
+        document.documentElement.setAttribute("data-ui-theme", "dark");
       }
     } catch (e) {}
   };
@@ -89,6 +105,14 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme || "red");
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-button-color", buttonColor || "theme");
+  }, [buttonColor]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-ui-theme", uiTheme || "dark");
+  }, [uiTheme]);
 
   useEffect(() => {
     if (panelLogo) {
@@ -118,6 +142,8 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       enableLoginAnimation, setEnableLoginAnimation,
       enableRegistration, setEnableRegistration,
       theme, setTheme,
+      buttonColor, setButtonColor,
+      uiTheme, setUiTheme,
       enableGoogleLogin, setEnableGoogleLogin,
       firebaseApiKey, setFirebaseApiKey,
       firebaseAuthDomain, setFirebaseAuthDomain,
@@ -125,6 +151,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       firebaseStorageBucket, setFirebaseStorageBucket,
       firebaseMessagingSenderId, setFirebaseMessagingSenderId,
       firebaseAppId, setFirebaseAppId, defaultRuntime, setDefaultRuntime, runtimeLocked, setRuntimeLocked,
+      environment, setEnvironment,
       isDev, setIsDev,
       playitServiceMode, setPlayitServiceMode,
       playitServiceName, setPlayitServiceName,

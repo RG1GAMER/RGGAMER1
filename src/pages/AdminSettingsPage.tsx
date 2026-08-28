@@ -8,7 +8,8 @@ import {
   Check, Shield, User, Trash2, Layout, Upload, RefreshCw, Key, 
   CheckCircle2, AlertCircle, Sparkles, ExternalLink, Cpu, Image, 
   Settings, ArrowLeft, Menu, X, Lock, Palette, UserPlus,
-  Activity, AlertTriangle, Loader2, Save
+  Activity, AlertTriangle, Loader2, Save, MousePointerClick, Sliders,
+  Server, HardDrive, Terminal, Globe, Laptop, Radio, Cloud, Boxes, Network
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import AdminControls from '../components/AdminControls';
@@ -40,6 +41,7 @@ export default function AdminSettingsPage(): React.ReactElement {
   const { 
     panelName, panelLogo, panelBackgroundImage, panelBackgroundBlur, 
     enablePlayit, enableTutorial, enableLoginAnimation, enableRegistration, theme, setTheme, 
+    buttonColor, setButtonColor, uiTheme, setUiTheme,
     enableGoogleLogin, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, 
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, defaultRuntime, runtimeLocked,
     isDev, fetchSettings, setDefaultRuntime,
@@ -198,6 +200,25 @@ export default function AdminSettingsPage(): React.ReactElement {
     setCustomBgUrlInput(panelBackgroundImage || "");
     setNewDefaultRuntime(defaultRuntime || 'docker');
   }, [defaultRuntime, panelName, panelBackgroundImage, enablePlayit, enableTutorial, enableLoginAnimation, enableRegistration, theme, setTheme, enableGoogleLogin, firebaseApiKey, firebaseAuthDomain, firebaseProjectId, firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId]);
+
+  const [envData, setEnvData] = useState<any>(null);
+  const [isRefreshingEnv, setIsRefreshingEnv] = useState<boolean>(false);
+
+  const fetchEnvironmentData = async (forceRefresh = false) => {
+    try {
+      setIsRefreshingEnv(true);
+      const res = await axios.get(`/api/system/environment${forceRefresh ? '?refresh=true' : ''}`);
+      setEnvData(res.data);
+    } catch (e) {
+      console.warn("Failed to fetch environment info", e);
+    } finally {
+      setIsRefreshingEnv(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnvironmentData();
+  }, []);
 
   const handleSaveFirebaseSettings = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -703,6 +724,202 @@ export default function AdminSettingsPage(): React.ReactElement {
                         </div>
                       </section>
 
+                      {/* Sub-section: Overall UI Base Theme & Surface Colors */}
+                      <section className="bg-card/80 backdrop-blur-xl border border-border-subtle rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+                        <div className="mb-6 border-b border-border-subtle pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <h2 className="text-xl font-bold flex items-center text-foreground">
+                              <Layout className="mr-3 text-theme-500 w-5 h-5" /> UI Base Colors & Interface Theme
+                            </h2>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Panel ki overall background, cards, sidebars aur interface surface ke colors customize karein (Dark, Pure Black, Light/White, Midnight Navy, etc.).
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-muted border border-border-subtle text-foreground flex items-center gap-1.5 shadow-sm">
+                              <span 
+                                className="w-2.5 h-2.5 rounded-full shadow-sm border border-border" 
+                                style={{ 
+                                  backgroundColor: uiTheme === 'light' ? '#f4f4f6' : (uiTheme === 'black' ? '#000000' : (uiTheme === 'navy' ? '#0b1329' : (uiTheme === 'slate' ? '#1e293b' : (uiTheme === 'purple' ? '#140c2b' : (uiTheme === 'emerald' ? '#07261b' : (uiTheme === 'crimson' ? '#26070c' : (uiTheme === 'amber' ? '#241808' : '#121217'))))))),
+                                }} 
+                              />
+                              <span className="capitalize font-semibold">{uiTheme || 'dark'} UI</span>
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 relative z-10">
+                          {[
+                            { id: "dark", label: "Dark Onyx (Default)", desc: "Modern deep charcoal dark theme", bg: "#09090b", card: "#121217", text: "#ffffff", border: "rgba(255,255,255,0.1)" },
+                            { id: "black", label: "Obsidian OLED Black", desc: "Pitch black background with crisp onyx cards", bg: "#000000", card: "#09090b", text: "#ffffff", border: "rgba(255,255,255,0.15)" },
+                            { id: "light", label: "Clean Studio Light", desc: "Pure crisp white & light surface theme", bg: "#f4f4f6", card: "#ffffff", text: "#09090b", border: "rgba(0,0,0,0.12)" },
+                            { id: "navy", label: "Cyber Midnight Navy", desc: "Deep oceanic blue dark interface", bg: "#020617", card: "#0b1329", text: "#f8fafc", border: "rgba(59,130,246,0.25)" },
+                            { id: "slate", label: "Slate Gunmetal", desc: "Refined zinc and metallic slate dark", bg: "#0f172a", card: "#1e293b", text: "#f1f5f9", border: "rgba(148,163,184,0.25)" },
+                            { id: "purple", label: "Royal Deep Violet", desc: "Atmospheric neon purple night", bg: "#080414", card: "#140c2b", text: "#faf5ff", border: "rgba(168,85,247,0.25)" },
+                            { id: "emerald", label: "Forest Emerald Dark", desc: "Cyberpunk matrix pine green dark", bg: "#02140d", card: "#07261b", text: "#ecfdf5", border: "rgba(16,185,129,0.25)" },
+                            { id: "crimson", label: "Crimson Blood Dark", desc: "Intense dark ruby wine interface", bg: "#140305", card: "#26070c", text: "#fff1f2", border: "rgba(244,63,94,0.25)" },
+                            { id: "amber", label: "Espresso Amber Dark", desc: "Warm gold & roasted coffee dark theme", bg: "#120c04", card: "#241808", text: "#fffbeb", border: "rgba(245,158,11,0.25)" },
+                          ].map((themeOption) => {
+                            const isSelected = (uiTheme || 'dark') === themeOption.id;
+                            return (
+                              <button
+                                key={themeOption.id}
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    setUiTheme(themeOption.id);
+                                    document.documentElement.setAttribute('data-ui-theme', themeOption.id);
+                                    await axios.put("/api/system/settings", { uiTheme: themeOption.id });
+                                  } catch(e) {}
+                                }}
+                                className={`p-4 rounded-xl border text-left transition-all relative overflow-hidden group flex flex-col justify-between gap-3 ${isSelected ? 'bg-card border-theme-500 ring-2 ring-theme-500/50 shadow-lg shadow-theme-500/10' : 'bg-muted/40 border-border hover:border-theme-500/40 hover:bg-muted/70'}`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  {/* Color preview chip */}
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-10 h-7 rounded-lg border shadow-sm flex items-center justify-center p-1"
+                                      style={{ backgroundColor: themeOption.bg, borderColor: themeOption.border }}
+                                    >
+                                      <div 
+                                        className="w-full h-full rounded flex items-center justify-center text-[9px] font-bold"
+                                        style={{ backgroundColor: themeOption.card, color: themeOption.text }}
+                                      >
+                                        UI
+                                      </div>
+                                    </div>
+                                    <span className={`text-xs font-bold ${isSelected ? 'text-foreground' : 'text-foreground/80'}`}>
+                                      {themeOption.label}
+                                    </span>
+                                  </div>
+
+                                  {isSelected && (
+                                    <span className="w-5 h-5 rounded-full bg-theme-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                                      <Check size={12} className="stroke-[3]" />
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="text-[11px] text-muted-foreground leading-snug">
+                                  {themeOption.desc}
+                                </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </section>
+
+                      {/* Sub-section: Button Colors & Styling (Requested above Theme & Accent Colors) */}
+                      <section className="bg-card/80 backdrop-blur-xl border border-border-subtle rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+                        <div className="mb-6 border-b border-border-subtle pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <h2 className="text-xl font-bold flex items-center text-foreground">
+                              <MousePointerClick className="mr-3 text-theme-500 w-5 h-5" /> Button Colors & Action Styles
+                            </h2>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Panel ke tamam primary buttons aur action controls ke colors customize karein (Red, Black, Blue, Green, Purple, Cyan, White, etc.).
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-muted border border-border-subtle text-foreground flex items-center gap-1.5 shadow-sm">
+                              <span 
+                                className="w-2 h-2 rounded-full shadow-sm" 
+                                style={{ 
+                                  backgroundColor: buttonColor === 'theme' 
+                                    ? 'var(--theme-500)' 
+                                    : (buttonColor === 'white' ? '#fff' : (buttonColor === 'black' ? '#09090b' : (buttonColor === 'blue' ? '#3b82f6' : (buttonColor === 'green' ? '#10b981' : (buttonColor === 'purple' ? '#a855f7' : (buttonColor === 'cyan' ? '#06b6d4' : (buttonColor === 'orange' ? '#f97316' : (buttonColor === 'amber' ? '#f59e0b' : (buttonColor === 'rose' ? '#f43f5e' : (buttonColor === 'indigo' ? '#6366f1' : '#ef4444')))))))))) 
+                                }} 
+                              />
+                              <span className="capitalize font-semibold">{buttonColor === 'theme' ? 'Sync with Theme' : `${buttonColor} Buttons`}</span>
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-6 relative z-10">
+                          {/* Color Palette Buttons Grid */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                            {[
+                              { id: "theme", label: "Match Theme", color: "linear-gradient(135deg, #ef4444, #3b82f6, #10b981)", isSpecial: true },
+                              { id: "red", label: "Crimson Red", color: "#ef4444" },
+                              { id: "black", label: "Obsidian Black", color: "#09090b" },
+                              { id: "blue", label: "Cobalt Blue", color: "#3b82f6" },
+                              { id: "green", label: "Emerald Green", color: "#10b981" },
+                              { id: "purple", label: "Electric Purple", color: "#a855f7" },
+                              { id: "cyan", label: "Cyber Cyan", color: "#06b6d4" },
+                              { id: "orange", label: "Sunset Orange", color: "#f97316" },
+                              { id: "amber", label: "Amber Gold", color: "#f59e0b" },
+                              { id: "rose", label: "Vivid Rose", color: "#f43f5e" },
+                              { id: "indigo", label: "Indigo Violet", color: "#6366f1" },
+                              { id: "white", label: "Pure White", color: "#ffffff" },
+                            ].map((btnOption) => {
+                              const isSelected = (buttonColor || 'theme') === btnOption.id;
+                              return (
+                                <button
+                                  key={btnOption.id}
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      setButtonColor(btnOption.id);
+                                      document.documentElement.setAttribute('data-button-color', btnOption.id);
+                                      await axios.put("/api/system/settings", { buttonColor: btnOption.id });
+                                    } catch(e) {}
+                                  }}
+                                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all text-left group ${isSelected ? 'bg-card border-theme-500 ring-2 ring-theme-500/50 shadow-md shadow-theme-500/10' : 'bg-muted/40 border-border hover:border-theme-500/40 hover:bg-muted/70'}`}
+                                >
+                                  <span 
+                                    className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-sm border border-white/10"
+                                    style={btnOption.isSpecial ? { background: btnOption.color } : { backgroundColor: btnOption.color }}
+                                  >
+                                    {isSelected && (
+                                      <Check 
+                                        size={12} 
+                                        className={btnOption.id === 'white' ? 'text-zinc-950 stroke-[3]' : 'text-white stroke-[3]'} 
+                                      />
+                                    )}
+                                  </span>
+                                  <span className={`text-xs font-medium truncate ${isSelected ? 'text-foreground font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>
+                                    {btnOption.label}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Live Interactive Button Preview */}
+                          <div className="p-4 rounded-xl bg-background/80 border border-border-subtle flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-0.5">
+                              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-theme-400" /> Live Button Style Preview
+                              </span>
+                              <p className="text-[11px] text-muted-foreground">
+                                Selected color live applies across dashboard buttons, modal confirms, and power controls.
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <button 
+                                type="button"
+                                className="px-4 py-2 bg-theme-600 hover:bg-theme-500 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+                              >
+                                <Save className="w-3.5 h-3.5" />
+                                <span>Primary Action</span>
+                              </button>
+                              
+                              <button 
+                                type="button"
+                                className="px-3.5 py-2 bg-muted hover:bg-muted-hover text-foreground font-semibold text-xs rounded-xl border border-border transition-all active:scale-95"
+                              >
+                                Secondary
+                              </button>
+                              
+                              <span className="px-2.5 py-1 text-[11px] font-mono font-bold rounded-lg border border-theme-500/40 text-theme-400 bg-theme-500/10">
+                                Active Status
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
                       {/* Sub-section 2: Themes & Visual Styling */}
                       <section className="bg-card/80 backdrop-blur-xl border border-border-subtle rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
                         <div className="mb-6 border-b border-border-subtle pb-4">
@@ -715,7 +932,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                         </div>
                         
                         <div className="relative z-10">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
                             {[
                               { name: "red", label: "Crimson Red", color: "#ef4444" },
                               { name: "blue", label: "Cobalt Blue", color: "#3b82f6" },
@@ -725,7 +942,8 @@ export default function AdminSettingsPage(): React.ReactElement {
                               { name: "amber", label: "Amber Gold", color: "#f59e0b" },
                               { name: "orange", label: "Sunset Orange", color: "#f97316" },
                               { name: "rose", label: "Vivid Rose", color: "#f43f5e" },
-                              { name: "white", label: "Monochrome Slate", color: "#71717a" }
+                              { name: "black", label: "Obsidian Black", color: "#09090b" },
+                              { name: "white", label: "Pure White", color: "#ffffff" }
                             ].map(t => (
                               <button
                                 key={t.name}
@@ -740,10 +958,15 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition-all text-left ${theme === t.name ? 'bg-card border-theme-500 ring-1 ring-theme-500 shadow-md shadow-theme-500/10' : 'bg-muted/40 border-border hover:border-theme-500/40 hover:bg-muted/70'}`}
                               >
                                 <span 
-                                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-sm"
+                                  className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 shadow-sm border border-white/10"
                                   style={{ backgroundColor: t.color }}
                                 >
-                                  {theme === t.name && <Check size={12} className={t.name === 'white' ? 'text-zinc-900 stroke-[3]' : 'text-white stroke-[3]'} />}
+                                  {theme === t.name && (
+                                    <Check 
+                                      size={12} 
+                                      className={t.name === 'white' ? 'text-zinc-950 stroke-[3]' : 'text-white stroke-[3]'} 
+                                    />
+                                  )}
                                 </span>
                                 <span className={`text-xs font-medium truncate ${theme === t.name ? 'text-foreground font-semibold' : 'text-muted-foreground'}`}>
                                   {t.label}
@@ -760,7 +983,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                               <Image className="mr-2 text-theme-500 w-4 h-4" /> Custom Dashboard Background
                             </h3>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Upload custom wallpapers, configure backdrop blur, or choose from atmospheric presets.
+                              Upload custom wallpapers, select clean white backgrounds, configure blur, or pick curated presets.
                             </p>
                           </div>
 
@@ -771,7 +994,11 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 <label className="block text-sm font-medium text-muted-foreground mb-3">Upload Custom Image</label>
                                 <div className="flex gap-4 items-end">
                                   <div className="w-32 h-20 rounded-xl border-2 border-dashed border-border-subtle bg-muted overflow-hidden relative group flex-shrink-0 flex items-center justify-center">
-                                    {panelBackgroundImage ? (
+                                    {panelBackgroundImage === 'solid-white' ? (
+                                      <div className="w-full h-full bg-gradient-to-br from-white via-zinc-100 to-zinc-200 flex items-center justify-center font-mono text-[10px] text-zinc-800 font-bold">
+                                        Solid White
+                                      </div>
+                                    ) : panelBackgroundImage ? (
                                       <img src={panelBackgroundImage} alt="Background Preview" className="w-full h-full object-cover" style={{ filter: `blur(${panelBackgroundBlur}px)` }} />
                                     ) : (
                                       <Image className="w-6 h-6 text-muted-foreground/50" />
@@ -797,7 +1024,25 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-2 pt-2 border-t border-border-subtle">
+                              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border-subtle">
+                                <button 
+                                  disabled={isProcessing}
+                                  onClick={async () => {
+                                    setIsProcessing(true);
+                                    try {
+                                      await axios.put("/api/system/settings", { panelBackgroundImage: "solid-white", panelBackgroundBlur: 0 });
+                                      setCustomBgUrlInput("solid-white");
+                                      await fetchSettings();
+                                    } catch(e) {} finally {
+                                      setIsProcessing(false);
+                                    }
+                                  }}
+                                  className="flex-1 flex items-center justify-center gap-1.5 bg-white text-zinc-950 font-bold hover:bg-zinc-100 px-3.5 py-2 rounded-xl transition-all shadow-sm text-xs border border-zinc-200"
+                                >
+                                  <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 border border-zinc-400" />
+                                  <span>Solid White Background</span>
+                                </button>
+
                                 <button 
                                   disabled={isProcessing}
                                   onClick={async () => {
@@ -810,9 +1055,9 @@ export default function AdminSettingsPage(): React.ReactElement {
                                       setIsProcessing(false);
                                     }
                                   }}
-                                  className="flex items-center justify-center gap-2 bg-muted hover:bg-muted-hover text-foreground border border-border font-medium px-4 py-2.5 rounded-xl transition-all shadow-sm text-sm"
+                                  className="flex items-center justify-center gap-1.5 bg-muted hover:bg-muted-hover text-foreground border border-border font-medium px-3.5 py-2 rounded-xl transition-all shadow-sm text-xs"
                                 >
-                                  Reset to Default
+                                  Reset Default
                                 </button>
                               </div>
 
@@ -884,32 +1129,77 @@ export default function AdminSettingsPage(): React.ReactElement {
                               
                               {/* Preset Themes */}
                               <div className="space-y-3 pt-2 border-t border-border-subtle">
-                                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">Quick Wallpaper Presets</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {[
-                                    { name: "Deep Space", url: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1600&auto=format&fit=crop" },
-                                    { name: "Cyberpunk City", url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1600&auto=format&fit=crop" },
-                                    { name: "Dark Abstract", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop" },
-                                    { name: "Neon Horizon", url: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1600&auto=format&fit=crop" },
-                                  ].map((preset) => (
-                                    <button
-                                      key={preset.name}
-                                      onClick={async () => {
-                                        setIsProcessing(true);
-                                        setCustomBgUrlInput(preset.url);
-                                        try {
-                                          await axios.put("/api/system/settings", { panelBackgroundImage: preset.url });
-                                          await fetchSettings();
-                                        } catch(e) {} finally {
-                                          setIsProcessing(false);
-                                        }
-                                      }}
-                                      className="flex items-center gap-2 p-2 rounded-xl bg-background border border-border hover:border-theme-600/50 hover:bg-muted/50 transition-all text-left group"
-                                    >
-                                      <img src={preset.url} alt={preset.name} className="w-8 h-8 rounded-lg object-cover group-hover:scale-105 transition-transform" />
-                                      <span className="text-xs font-medium text-foreground group-hover:text-theme-500">{preset.name}</span>
-                                    </button>
-                                  ))}
+                                <div className="flex items-center justify-between">
+                                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">Wallpaper Presets</label>
+                                  <span className="text-[11px] text-theme-400 font-mono">White & Dark Options</span>
+                                </div>
+
+                                {/* White / Light Wallpaper Presets */}
+                                <div className="space-y-1.5">
+                                  <div className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                                    <span>White & Light Wallpapers:</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { name: "Minimal Studio White", url: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "Clean Minimal Light", url: "https://images.unsplash.com/photo-1513694203232-719a280e022f?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "White Marble Luxury", url: "https://images.unsplash.com/photo-1533035353720-f1c6a75cd8ab?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "Geometric Light Mesh", url: "https://images.unsplash.com/photo-1507499739999-097706ad8914?q=80&w=1600&auto=format&fit=crop" },
+                                    ].map((preset) => (
+                                      <button
+                                        key={preset.name}
+                                        onClick={async () => {
+                                          setIsProcessing(true);
+                                          setCustomBgUrlInput(preset.url);
+                                          try {
+                                            await axios.put("/api/system/settings", { panelBackgroundImage: preset.url });
+                                            await fetchSettings();
+                                          } catch(e) {} finally {
+                                            setIsProcessing(false);
+                                          }
+                                        }}
+                                        className="flex items-center gap-2 p-1.5 rounded-xl bg-background border border-border hover:border-theme-500/50 hover:bg-muted/50 transition-all text-left group"
+                                      >
+                                        <img src={preset.url} alt={preset.name} className="w-7 h-7 rounded-lg object-cover group-hover:scale-105 transition-transform" />
+                                        <span className="text-[11px] font-medium text-foreground group-hover:text-theme-400 truncate">{preset.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Dark Wallpaper Presets */}
+                                <div className="space-y-1.5 pt-1">
+                                  <div className="text-[11px] font-bold text-zinc-400 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-zinc-800 border border-zinc-600" />
+                                    <span>Dark Atmospheric Wallpapers:</span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                      { name: "Deep Space", url: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "Cyberpunk City", url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "Dark Abstract", url: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop" },
+                                      { name: "Neon Horizon", url: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1600&auto=format&fit=crop" },
+                                    ].map((preset) => (
+                                      <button
+                                        key={preset.name}
+                                        onClick={async () => {
+                                          setIsProcessing(true);
+                                          setCustomBgUrlInput(preset.url);
+                                          try {
+                                            await axios.put("/api/system/settings", { panelBackgroundImage: preset.url });
+                                            await fetchSettings();
+                                          } catch(e) {} finally {
+                                            setIsProcessing(false);
+                                          }
+                                        }}
+                                        className="flex items-center gap-2 p-1.5 rounded-xl bg-background border border-border hover:border-theme-500/50 hover:bg-muted/50 transition-all text-left group"
+                                      >
+                                        <img src={preset.url} alt={preset.name} className="w-7 h-7 rounded-lg object-cover group-hover:scale-105 transition-transform" />
+                                        <span className="text-[11px] font-medium text-foreground group-hover:text-theme-400 truncate">{preset.name}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1215,6 +1505,93 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 </div>
                               </div>
                             )}
+
+                            {/* Environment Auto-Detection Card */}
+                            <div className="p-5 rounded-2xl bg-muted/40 border border-border-subtle relative overflow-hidden">
+                              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-theme-500/10 border border-theme-500/30 flex items-center justify-center text-theme-400">
+                                    {envData?.environmentType === "sandbox" ? (
+                                      <Boxes className="w-5 h-5" />
+                                    ) : envData?.environmentType === "codespaces" ? (
+                                      <Terminal className="w-5 h-5" />
+                                    ) : envData?.environmentType === "pc" ? (
+                                      <Laptop className="w-5 h-5" />
+                                    ) : (
+                                      <Server className="w-5 h-5" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-bold text-sm text-foreground">
+                                        {envData?.environmentName || "Host Environment Detection"}
+                                      </h4>
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-theme-500/20 text-theme-400 border border-theme-500/30 uppercase">
+                                        {envData?.environmentBadge || "Auto-Detecting..."}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Platform: <span className="text-foreground font-mono">{envData?.distro || envData?.platform || "Linux"} ({envData?.arch || "x64"})</span> • Host: <span className="text-foreground font-mono">{envData?.hostname || "local"}</span>
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  disabled={isRefreshingEnv}
+                                  onClick={() => fetchEnvironmentData(true)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted hover:bg-muted-hover text-foreground border border-border text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                                >
+                                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingEnv ? "animate-spin text-theme-500" : ""}`} />
+                                  <span>{isRefreshingEnv ? "Detecting..." : "Re-Detect Environment"}</span>
+                                </button>
+                              </div>
+
+                              {/* Specs & Capabilities Grid */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs mb-4">
+                                <div className="p-3 rounded-xl bg-background/60 border border-border-subtle">
+                                  <div className="text-muted-foreground text-[11px]">CPU & Cores</div>
+                                  <div className="font-bold text-foreground mt-0.5 truncate">{envData?.hardware?.cpuCores || 1} Cores</div>
+                                  <div className="text-[10px] text-muted-foreground truncate">{envData?.hardware?.cpuModel || "Standard"}</div>
+                                </div>
+                                <div className="p-3 rounded-xl bg-background/60 border border-border-subtle">
+                                  <div className="text-muted-foreground text-[11px]">System Memory</div>
+                                  <div className="font-bold text-foreground mt-0.5">{envData?.hardware?.totalMemoryGB || 0} GB RAM</div>
+                                  <div className="text-[10px] text-emerald-400">{envData?.hardware?.freeMemoryGB || 0} GB Available</div>
+                                </div>
+                                <div className="p-3 rounded-xl bg-background/60 border border-border-subtle">
+                                  <div className="text-muted-foreground text-[11px]">Docker Daemon</div>
+                                  <div className="font-bold mt-0.5 flex items-center gap-1.5">
+                                    <span className={`w-2 h-2 rounded-full ${envData?.capabilities?.dockerAvailable ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-zinc-500"}`} />
+                                    <span className={envData?.capabilities?.dockerAvailable ? "text-emerald-400 font-mono" : "text-muted-foreground"}>
+                                      {envData?.capabilities?.dockerAvailable ? (envData?.capabilities?.dockerVersion || "Active") : "Not Active"}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {envData?.capabilities?.dockerAvailable ? "Containers Ready" : "Local Process Active"}
+                                  </div>
+                                </div>
+                                <div className="p-3 rounded-xl bg-background/60 border border-border-subtle">
+                                  <div className="text-muted-foreground text-[11px]">Java Runtime</div>
+                                  <div className="font-bold text-foreground mt-0.5 truncate">
+                                    {envData?.capabilities?.javaAvailable ? envData?.capabilities?.javaVersion : "Adoptium OpenJDK"}
+                                  </div>
+                                  <div className="text-[10px] text-theme-400">Auto-Provisioning JRE</div>
+                                </div>
+                              </div>
+
+                              {/* Environment Notes & Insights */}
+                              {envData?.autoTunedSettings?.notes?.length > 0 && (
+                                <div className="p-3 rounded-xl bg-background/40 border border-border-subtle/60 text-xs space-y-1">
+                                  {envData.autoTunedSettings.notes.map((note: string, idx: number) => (
+                                    <div key={idx} className="flex items-start gap-2 text-muted-foreground">
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-theme-500 shrink-0 mt-0.5" />
+                                      <span>{note}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
 
                             <div>
                               <h4 className="font-semibold text-foreground flex items-center gap-2">Default Server Runtime</h4>

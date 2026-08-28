@@ -2,12 +2,13 @@
 // @ts-nocheck
 import React, { useEffect, useState } from "react"; 
 import { LoadingOverlay } from "../components/LoadingOverlay";
-import { useParams, Link, Routes, Route, useLocation } from "react-router-dom";
+import { useParams, Link, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Terminal, Folder, Play, Square, RefreshCw, ArrowLeft, Sliders, Archive, AlertTriangle, Copy, Check, Menu, X, Users, LogOut, Lock } from "lucide-react";
+import { Terminal, Folder, Play, Square, RefreshCw, ArrowLeft, Sliders, Archive, AlertTriangle, Copy, Check, Menu, X, Users, LogOut, Lock, Globe, Zap, Sparkles, Radio } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import ServerConsole from "../components/ServerConsole";
+import ServerResourceDashboard from "../components/ServerResourceDashboard";
 import FileManager from "../components/FileManager";
 import ServerSettings from "../components/ServerSettings";
 import ServerProperties from "../components/ServerProperties";
@@ -24,12 +25,13 @@ import AddonsManager from "../components/AddonsManager";
 import SoftwareManager from "../components/SoftwareManager";
 import { Map, Palette } from "lucide-react";
 import { Puzzle, Box, Network, Cpu, Layers as LayersIcon } from "lucide-react";
-import { Settings, Globe } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
 
 
 export default function ServerView() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { enablePlayit } = useSettings();
   const [server, setServer] = useState<any>(null);
   const [totalSystemRam, setTotalSystemRam] = useState<number>(0);
@@ -38,7 +40,13 @@ export default function ServerView() {
   const [isProcessing, setIsProcessing] = useState(false);
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
+  // Playit Agent & Tunnel State
+  const [playitStatus, setPlayitStatus] = useState<"running" | "stopped" | "checking">("checking");
+  const [playitPublicAddress, setPlayitPublicAddress] = useState<string | null>(null);
+  const [isPlayitProcessing, setIsPlayitProcessing] = useState(false);
+  const [copiedPlayit, setCopiedPlayit] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string>("start");
 
   const handleCopyIp = () => {
     if (!server) return;
@@ -48,6 +56,14 @@ export default function ServerView() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyPlayitAddress = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!playitPublicAddress) return;
+    navigator.clipboard.writeText(playitPublicAddress);
+    setCopiedPlayit(true);
+    setTimeout(() => setCopiedPlayit(false), 2000);
+  };
+
   const fetchServer = async () => {
     try {
       const res = await axios.get(`/api/servers/${id}`);
@@ -55,31 +71,82 @@ export default function ServerView() {
     } catch(e) {}
   };
 
+  const fetchPlayitStatus = async () => {
+    try {
+      const res = await axios.get(`/api/servers/${id}/playit`);
+      setPlayitStatus(res.data.status || "stopped");
+      setPlayitPublicAddress(res.data.publicAddress || null);
+    } catch (e) {
+      setPlayitStatus("stopped");
+    }
+  };
+
   useEffect(() => {
     fetchServer();
+    fetchPlayitStatus();
     axios.get("/api/system/stats").then(res => {
       setTotalSystemRam(res.data.totalMemory / (1024 * 1024 * 1024));
     }).catch(() => {});
-    const interval = setInterval(fetchServer, 5000);
+    const interval = setInterval(() => {
+      fetchServer();
+      fetchPlayitStatus();
+    }, 5000);
     return () => clearInterval(interval);
   }, [id]);
 
   const executeAction = async (action: string) => {
     setIsProcessing(true);
     try {
-       await axios.post(`/api/servers/${id}/${action}`);
-       await fetchServer();
+       if (action === 'start-both') {
+         setIsPlayitProcessing(true);
+         await Promise.allSettled([
+           axios.post(`/api/servers/${id}/start`),
+           axios.post(`/api/servers/${id}/playit/start`)
+         ]);
+         await Promise.allSettled([fetchServer(), fetchPlayitStatus()]);
+       } else {
+         await axios.post(`/api/servers/${id}/${action}`);
+         await fetchServer();
+       }
     } catch(e) {} finally {
        setIsProcessing(false);
+       setIsPlayitProcessing(false);
     }
   };
 
   const handleAction = async (action: string) => {
-    if (action === 'start' && totalSystemRam > 0 && server?.ram > totalSystemRam && !showRamWarning) {
+    if ((action === 'start' || action === 'start-both') && totalSystemRam > 0 && server?.ram > totalSystemRam && !showRamWarning) {
+      setPendingAction(action);
       setShowRamWarning(true);
       return;
     }
     executeAction(action);
+  };
+
+  const handlePlayitStart = async () => {
+    setIsPlayitProcessing(true);
+    try {
+      await axios.post(`/api/servers/${id}/playit/start`);
+      setPlayitStatus("running");
+      await fetchPlayitStatus();
+    } catch (e) {
+      console.error("Failed to start playit", e);
+    } finally {
+      setIsPlayitProcessing(false);
+    }
+  };
+
+  const handlePlayitStop = async () => {
+    setIsPlayitProcessing(true);
+    try {
+      await axios.post(`/api/servers/${id}/playit/stop`);
+      setPlayitStatus("stopped");
+      await fetchPlayitStatus();
+    } catch (e) {
+      console.error("Failed to stop playit", e);
+    } finally {
+      setIsPlayitProcessing(false);
+    }
   };
 
   if (!server) return (
@@ -121,10 +188,8 @@ export default function ServerView() {
     tabs = [
       { name: "Console", path: `/servers/${id}`, exactPath: "", icon: <Terminal size={18} /> },
       { name: "File Manager", path: `/servers/${id}/files`, exactPath: "files", icon: <Folder size={18} /> },
-      { name: "SFTP Details", path: `/servers/${id}/sftp`, exactPath: "sftp", icon: <Network size={18} /> },
       { name: "Software", path: `/servers/${id}/software`, exactPath: "software", icon: <LayersIcon size={18} /> },
       { name: "Backup", path: `/servers/${id}/backup`, exactPath: "backup", icon: <Archive size={18} /> },
-      { name: "Sub-Users", path: `/servers/${id}/subusers`, exactPath: "subusers", icon: <Users size={18} /> },
       { name: "Settings", path: `/servers/${id}/settings`, exactPath: "settings", icon: <Settings size={18} /> },
     ];
   } else {
@@ -132,8 +197,6 @@ export default function ServerView() {
       { name: "Terminal", path: `/servers/${id}`, exactPath: "", icon: <Terminal size={18} /> },
       { name: "Players", path: `/servers/${id}/players`, exactPath: "players", icon: <Users size={18} /> },
       { name: "File Manager", path: `/servers/${id}/files`, exactPath: "files", icon: <Folder size={18} /> },
-      { name: "SFTP Details", path: `/servers/${id}/sftp`, exactPath: "sftp", icon: <Network size={18} /> },
-      { name: "Sub-Users", path: `/servers/${id}/subusers`, exactPath: "subusers", icon: <Users size={18} /> },
     ];
 
     if (!isProxy) {
@@ -186,8 +249,8 @@ export default function ServerView() {
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-black/90 md:bg-black/80 backdrop-blur-3xl border-r border-theme-500/20 flex flex-col shadow-2xl shadow-theme-900/50 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between p-4 border-b border-theme-500/20 shrink-0 bg-black/60">
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-card/95 md:bg-card/90 backdrop-blur-3xl border-r border-theme-500/20 flex flex-col shadow-2xl shadow-theme-900/50 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between p-4 border-b border-theme-500/20 shrink-0 bg-card/80">
           <div className="flex items-center gap-3 min-w-0">
              <Link to="/servers" className="p-1.5 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-lg text-theme-400 hover:text-theme-100 transition-all shrink-0">
               <ArrowLeft size={16} />
@@ -196,7 +259,7 @@ export default function ServerView() {
           </div>
           <button 
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-1.5 text-zinc-400 hover:text-white bg-zinc-900 rounded-lg transition-colors"
+            className="md:hidden p-1.5 text-muted-foreground hover:text-foreground bg-muted rounded-lg transition-colors"
           >
             <X size={16} />
           </button>
@@ -204,7 +267,7 @@ export default function ServerView() {
         
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 custom-scrollbar">
           {/* Status & Quick Actions */}
-          <div className="mb-4 p-3 bg-black/60 rounded-xl border border-theme-500/20 shadow-inner">
+          <div className="mb-4 p-3 bg-muted/60 rounded-xl border border-theme-500/20 shadow-inner">
              <div className="flex items-center space-x-2 mb-3">
                 <span className="flex h-2.5 w-2.5 relative shrink-0">
                    {server.status === 'online' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-400 opacity-75"></span>}
@@ -221,17 +284,54 @@ export default function ServerView() {
              </div>
              <div className="grid grid-cols-2 gap-2">
                 {server.status !== 'online' ? (
-                  <button disabled={isProcessing} onClick={() => { handleAction('start'); setSidebarOpen(false); }} className="col-span-2 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold rounded-lg transition-all border border-emerald-500/40 flex items-center justify-center text-xs shadow-md shadow-emerald-500/10 disabled:opacity-50">
+                  <button disabled={isProcessing} onClick={() => { handleAction('start'); setSidebarOpen(false); }} className="py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold rounded-lg transition-all border border-emerald-500/40 flex items-center justify-center text-xs shadow-md shadow-emerald-500/10 disabled:opacity-50">
                     {isProcessing ? <div className="w-3.5 h-3.5 border-2 border-emerald-400/50 border-t-emerald-400 rounded-full animate-spin mr-1.5" /> : <Play className="w-3.5 h-3.5 mr-1.5 fill-emerald-400/20" />} Start
                   </button>
                 ) : (
-                  <button disabled={isProcessing} onClick={() => { handleAction('stop'); setSidebarOpen(false); }} className="col-span-2 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold rounded-lg transition-all border border-red-500/40 flex items-center justify-center text-xs shadow-md shadow-red-500/10 disabled:opacity-50">
+                  <button disabled={isProcessing} onClick={() => { handleAction('stop'); setSidebarOpen(false); }} className="py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold rounded-lg transition-all border border-red-500/40 flex items-center justify-center text-xs shadow-md shadow-red-500/10 disabled:opacity-50">
                     {isProcessing ? <div className="w-3.5 h-3.5 border-2 border-red-400/50 border-t-red-400 rounded-full animate-spin mr-1.5" /> : <Square className="w-3.5 h-3.5 mr-1.5 fill-red-400/20" />} Stop
                   </button>
                 )}
-                <button disabled={isProcessing} onClick={() => { handleAction('restart'); setSidebarOpen(false); }} className="col-span-2 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium rounded-lg transition-all border border-amber-500/40 flex items-center justify-center text-xs shadow-md shadow-amber-500/10 disabled:opacity-50">
+                <button disabled={isProcessing} onClick={() => { handleAction('restart'); setSidebarOpen(false); }} className="py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-medium rounded-lg transition-all border border-amber-500/40 flex items-center justify-center text-xs shadow-md shadow-amber-500/10 disabled:opacity-50">
                   {isProcessing ? <div className="w-3.5 h-3.5 border-2 border-amber-400/50 border-t-amber-400 rounded-full animate-spin mr-1.5" /> : <RefreshCw className="w-3.5 h-3.5 mr-1.5" />} Restart
                 </button>
+
+                {/* Playit Start Agent + Tunnel Quick Action */}
+                {playitStatus !== 'running' ? (
+                  <button 
+                    disabled={isPlayitProcessing} 
+                    onClick={() => { handlePlayitStart(); setSidebarOpen(false); }} 
+                    className="col-span-2 py-1.5 bg-theme-600/20 hover:bg-theme-600/30 text-theme-300 font-semibold rounded-lg transition-all border border-theme-500/40 flex items-center justify-center text-xs shadow-md shadow-theme-500/10 disabled:opacity-50 gap-1.5"
+                    title="Start Playit.gg Agent & Public Tunnel"
+                  >
+                    {isPlayitProcessing ? (
+                      <div className="w-3.5 h-3.5 border-2 border-theme-400/50 border-t-theme-400 rounded-full animate-spin" />
+                    ) : (
+                      <Globe className="w-3.5 h-3.5 text-theme-400" />
+                    )}
+                    <span>Start Playit Agent + Tunnel</span>
+                  </button>
+                ) : (
+                  <button 
+                    disabled={isPlayitProcessing} 
+                    onClick={() => { handlePlayitStop(); setSidebarOpen(false); }} 
+                    className="col-span-2 py-1.5 bg-emerald-500/15 hover:bg-rose-500/20 text-emerald-300 hover:text-rose-300 font-semibold rounded-lg transition-all border border-emerald-500/30 hover:border-rose-500/30 flex items-center justify-center text-xs shadow-md shadow-emerald-500/10 disabled:opacity-50 gap-1.5 group"
+                    title={playitPublicAddress ? `Playit Online: ${playitPublicAddress} (Click to Stop)` : "Playit Tunnel Online (Click to Stop)"}
+                  >
+                    {isPlayitProcessing ? (
+                      <div className="w-3.5 h-3.5 border-2 border-emerald-400/50 border-t-emerald-400 rounded-full animate-spin" />
+                    ) : (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    )}
+                    <span className="group-hover:hidden truncate max-w-[170px]">
+                      {playitPublicAddress ? `Playit: ${playitPublicAddress}` : "Playit: Active"}
+                    </span>
+                    <span className="hidden group-hover:inline">Stop Playit Tunnel</span>
+                  </button>
+                )}
              </div>
           </div>
           
@@ -280,7 +380,7 @@ export default function ServerView() {
 
       <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden relative isolate">
         {/* Top Header with Hamburger and Power Controls */}
-        <div className="bg-black/85 backdrop-blur-2xl border-b border-theme-500/20 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-lg shadow-black/80 relative z-20">
+        <div className="bg-card/90 backdrop-blur-2xl border-b border-theme-500/20 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-lg relative z-20">
           
           {/* Left: Hamburger + Server Name + Status */}
           <div className="flex items-center gap-2.5 min-w-0">
@@ -299,7 +399,7 @@ export default function ServerView() {
               </h1>
 
               {/* Status Pill */}
-              <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 shrink-0">
+              <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-muted/60 border border-border shrink-0">
                 <span className="flex h-2 w-2 relative shrink-0">
                   {server.status === 'online' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-400 opacity-75"></span>}
                   <span className={`relative inline-flex rounded-full h-2 w-2 ${server.status === 'online' ? 'bg-theme-500' : 'bg-red-500'}`}></span>
@@ -356,6 +456,73 @@ export default function ServerView() {
               </button>
             )}
 
+            {/* Playit Start Agent + Tunnel Button (Right next to Server Start Button) */}
+            {enablePlayit && (
+              <>
+                {playitStatus !== 'running' ? (
+                  <button 
+                    disabled={isPlayitProcessing} 
+                    onClick={handlePlayitStart} 
+                    className="px-3.5 sm:px-4 py-1.5 sm:py-2 bg-theme-600/20 hover:bg-theme-600/30 text-theme-300 font-mono font-bold rounded-xl transition-all border border-theme-500/40 flex items-center justify-center text-xs sm:text-sm shadow-lg shadow-theme-600/10 active:scale-95 disabled:opacity-40 shrink-0 gap-1.5"
+                    title="Start Playit.gg Agent & Public Ingress Tunnel"
+                  >
+                    {isPlayitProcessing ? (
+                      <div className="w-3.5 h-3.5 border-2 border-theme-400/50 border-t-theme-400 rounded-full animate-spin" />
+                    ) : (
+                      <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-theme-400" />
+                    )}
+                    <span>Playit Start</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button 
+                      onClick={handlePlayitStop}
+                      disabled={isPlayitProcessing}
+                      className="px-3 sm:px-3.5 py-1.5 sm:py-2 bg-emerald-500/15 hover:bg-rose-500/20 text-emerald-300 hover:text-rose-300 font-mono font-bold rounded-xl transition-all border border-emerald-500/30 hover:border-rose-500/30 flex items-center justify-center text-xs sm:text-sm shadow-lg shadow-emerald-500/10 active:scale-95 disabled:opacity-40 gap-1.5 group"
+                      title={playitPublicAddress ? `Playit Online: ${playitPublicAddress} (Click to Stop)` : "Playit Tunnel Active (Click to Stop)"}
+                    >
+                      {isPlayitProcessing ? (
+                        <div className="w-3.5 h-3.5 border-2 border-emerald-400/50 border-t-emerald-400 rounded-full animate-spin" />
+                      ) : (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                      )}
+                      <span className="group-hover:hidden flex items-center gap-1">
+                        <Globe className="w-3.5 h-3.5 text-emerald-400" />
+                        Playit Live
+                      </span>
+                      <span className="hidden group-hover:inline">Stop Playit</span>
+                    </button>
+                    {playitPublicAddress && (
+                      <button
+                        onClick={handleCopyPlayitAddress}
+                        className="px-2 py-1.5 sm:py-2 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 text-theme-300 hover:text-theme-100 rounded-xl transition-all font-mono text-xs hidden lg:flex items-center gap-1 shrink-0"
+                        title="Copy Playit Public Address"
+                      >
+                        <span className="truncate max-w-[120px]">{playitPublicAddress}</span>
+                        {copiedPlayit ? <Check size={12} className="text-theme-400" /> : <Copy size={12} className="text-theme-400" />}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Combo Button: Start Both (Server + Playit) when both are offline */}
+                {server.status !== 'online' && playitStatus !== 'running' && (
+                  <button 
+                    disabled={isProcessing || isPlayitProcessing} 
+                    onClick={() => handleAction('start-both')} 
+                    className="hidden xl:flex px-3 py-1.5 sm:py-2 bg-gradient-to-r from-emerald-500/20 via-theme-500/20 to-theme-500/30 hover:from-emerald-500/30 hover:to-theme-500/40 text-theme-200 font-mono font-bold rounded-xl transition-all border border-theme-500/40 items-center justify-center text-xs shadow-lg shadow-theme-500/10 active:scale-95 disabled:opacity-40 shrink-0 gap-1.5"
+                    title="Start both Server and Playit Agent + Tunnel together"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-theme-400" />
+                    <span>Start Both</span>
+                  </button>
+                )}
+              </>
+            )}
+
             {/* Restart Button */}
             <button 
               disabled={isProcessing} 
@@ -376,7 +543,22 @@ export default function ServerView() {
         <div className="flex-1 relative flex flex-col min-h-0 bg-transparent">
           <div className="flex-1 flex flex-col relative overflow-hidden bg-transparent min-h-0">
             <Routes>
-              <Route path="/" element={<ServerConsole serverId={id!} server={server} />} />
+              <Route 
+                path="/" 
+                element={
+                  <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+                    <ServerResourceDashboard
+                      serverId={id!}
+                      server={server}
+                      status={server.status}
+                      limitRam={server.ram}
+                    />
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <ServerConsole serverId={id!} server={server} />
+                    </div>
+                  </div>
+                } 
+              />
               <Route path="/players" element={<PlayerManager serverId={id!} />} />
               <Route path="/properties" element={<ServerProperties serverId={id!} />} />
               <Route path="/world" element={<WorldManager serverId={id!} server={server} onNavigateToFileManager={() => navigate(`/servers/${id}/files`)} />} />
@@ -432,7 +614,7 @@ export default function ServerView() {
                 <button
                   onClick={() => {
                     setShowRamWarning(false);
-                    executeAction('start');
+                    executeAction(pendingAction || 'start');
                   }}
                   className="px-4 py-2 bg-theme-500/20 hover:bg-theme-500/30 text-theme-400 font-bold rounded-xl transition-colors border border-theme-500/30"
                 >

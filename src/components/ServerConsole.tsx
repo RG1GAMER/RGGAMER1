@@ -10,6 +10,7 @@ import {
   Play,
   Trash2,
   ChevronDown,
+  ArrowDownToLine,
   AlertTriangle,
   Info
 } from "lucide-react";
@@ -177,32 +178,37 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
 
   // Synchronize server prop updates
   useEffect(() => {
-    if (server?.startedAt !== undefined) {
+    if (server?.startedAt) {
       setStartedAt(server.startedAt);
     }
     if (server?.status) {
-      setStatus(server.status);
+      const norm = server.status === "running" || server.status === "online" ? "online" : server.status;
+      setStatus(norm);
     }
   }, [server?.startedAt, server?.status]);
 
   // Live Accurate Uptime Ticker
   useEffect(() => {
     const updateTicker = () => {
-      const isOnline = status === "online";
-      if (!isOnline || !startedAt) {
+      const active = status === "online" || status === "running" || Boolean(stats.isRunning) || server?.status === "online";
+      if (!active) {
         setUptime("00:00:00");
         setUptimeHuman("0s");
         return;
       }
 
-      const startMs = new Date(startedAt).getTime();
-      if (isNaN(startMs) || startMs <= 0) {
-        setUptime("00:00:00");
-        setUptimeHuman("0s");
-        return;
+      const effectiveStartedAt = startedAt || stats.startedAt || server?.startedAt;
+      let elapsed = 0;
+      if (effectiveStartedAt) {
+        const startMs = new Date(effectiveStartedAt).getTime();
+        if (!isNaN(startMs) && startMs > 0) {
+          elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+        }
+      }
+      if (elapsed <= 0 && stats.uptimeSeconds && stats.uptimeSeconds > 0) {
+        elapsed = stats.uptimeSeconds;
       }
 
-      const elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
       setUptime(formatDuration(elapsed));
       setUptimeHuman(formatHumanDuration(elapsed));
     };
@@ -210,7 +216,7 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
     updateTicker();
     const interval = setInterval(updateTicker, 1000);
     return () => clearInterval(interval);
-  }, [startedAt, status]);
+  }, [startedAt, status, stats.isRunning, stats.startedAt, stats.uptimeSeconds, server?.status, server?.startedAt]);
 
   // Socket Connection for live logs
   useEffect(() => {
@@ -279,9 +285,12 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
           });
 
           if (data.status) {
-            setStatus(data.status);
+            const norm = data.status === "running" || data.status === "online" || data.isRunning ? "online" : data.status;
+            setStatus(norm);
+          } else if (data.isRunning !== undefined) {
+            setStatus(data.isRunning ? "online" : "offline");
           }
-          if (data.startedAt !== undefined) {
+          if (data.startedAt !== undefined && data.startedAt) {
             setStartedAt(data.startedAt);
           }
         }
@@ -321,6 +330,20 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
       setAutoScroll(true);
       setUnreadCount(0);
     }
+  }, []);
+
+  // Toggle Auto-scroll tracking on / off
+  const toggleAutoScroll = useCallback(() => {
+    setAutoScroll((prev) => {
+      const next = !prev;
+      if (next) {
+        if (bodyRef.current) {
+          bodyRef.current.scrollTo({ top: bodyRef.current.scrollHeight, behavior: "smooth" });
+        }
+        setUnreadCount(0);
+      }
+      return next;
+    });
   }, []);
 
   // Clear Terminal Output
@@ -380,8 +403,8 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
     [cmdHist]
   );
 
-  const isOnline = status === "online";
-  const startInfo = formatStartTime(startedAt);
+  const isOnline = status === "online" || status === "running" || Boolean(stats.isRunning) || server?.status === "online";
+  const startInfo = formatStartTime(startedAt || stats.startedAt || (server?.startedAt as string | null));
 
   // Vitals percentages - safe bounds [0, 100], guard against NaN and negative values
   const cpuPct = useMemo(() => {
@@ -575,8 +598,41 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
             </div>
           </div>
 
-          {/* Right: Clean Terminal Status & Clear Buffer */}
+          {/* Right: Clean Terminal Status, Auto-scroll Toggle & Clear Buffer */}
           <div className="flex items-center gap-2 ml-auto shrink-0">
+            {/* Auto-scroll Toggle Switch */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoScroll}
+              onClick={toggleAutoScroll}
+              title={
+                autoScroll
+                  ? "Auto-scroll is ON (tracking new logs). Click to pause scrolling."
+                  : "Auto-scroll is PAUSED. Click to enable auto-tracking."
+              }
+              className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border font-mono text-xs transition-all select-none active:scale-95 ${
+                autoScroll
+                  ? "bg-theme-500/15 border-theme-500/40 text-theme-300 shadow-sm shadow-theme-500/10"
+                  : "bg-white/5 hover:bg-white/10 border-white/15 text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <ArrowDownToLine className={`w-3.5 h-3.5 ${autoScroll ? "text-theme-400 animate-pulse" : "text-slate-500"}`} />
+              <span className="hidden sm:inline font-semibold">Auto-scroll</span>
+              {/* Interactive Switch Track & Knob */}
+              <div
+                className={`w-7 h-4 rounded-full p-0.5 transition-colors relative flex items-center ${
+                  autoScroll ? "bg-theme-500" : "bg-zinc-700"
+                }`}
+              >
+                <div
+                  className={`w-3 h-3 rounded-full bg-white transition-transform transform shadow-sm ${
+                    autoScroll ? "translate-x-3" : "translate-x-0"
+                  }`}
+                />
+              </div>
+            </button>
+
             {isOnline ? (
               <div 
                 className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-theme-500/10 border border-theme-500/30 text-theme-300 font-mono text-[11px] shadow-sm shadow-theme-500/15"
@@ -630,16 +686,18 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
             {logs.map((raw, index) => renderLogLine(raw, index))}
           </div>
 
-          {/* SLEEK FLOATING SIDE ARROW BUTTON */}
+          {/* SLEEK FLOATING AUTO-SCROLL RESUME BUTTON */}
           {!autoScroll && (
             <button
               onClick={scrollToBottom}
-              title="Scroll to latest logs"
-              className="absolute bottom-3 right-4 z-20 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-zinc-900/90 hover:bg-theme-500 hover:text-black border border-white/20 hover:border-theme-400 text-zinc-300 shadow-xl backdrop-blur-md flex items-center justify-center transition-all duration-200 active:scale-95 group"
+              title="Auto-scroll is paused. Click to jump to bottom and resume auto-scroll."
+              className="absolute bottom-3 right-4 z-20 px-3 py-1.5 rounded-full bg-zinc-900/95 hover:bg-theme-500 hover:text-black border border-theme-500/40 text-theme-300 shadow-2xl backdrop-blur-md flex items-center gap-1.5 text-xs font-mono font-bold transition-all duration-200 active:scale-95 group"
             >
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-y-0.5 transition-transform" />
+              <ArrowDownToLine className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+              <span className="hidden xs:inline">Auto-scroll</span>
+              <span className="text-[11px] opacity-80">Bottom</span>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-theme-500 text-black text-[10px] font-bold font-mono shadow-md flex items-center justify-center">
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-theme-500 text-black text-[10px] font-bold font-mono shadow-md flex items-center justify-center">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}

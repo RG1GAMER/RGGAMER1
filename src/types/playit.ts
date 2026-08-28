@@ -77,7 +77,7 @@ export interface PlayitAuditEntry {
   serverId: string;
   serverName: string;
   timestamp: string;
-  action: "automatic_recovery" | "manual_restart" | "force_recovery" | "agent_start" | "agent_stop" | "agent_reset";
+  action: "automatic_recovery" | "manual_restart" | "force_recovery" | "agent_start" | "agent_stop" | "agent_reset" | "agent_connect" | "agent_switch";
   trigger: "scheduled_monitor" | "on_demand_test" | "user_action";
   performedBy: string;
   previousStatus: PlayitTunnelHealthStatus;
@@ -87,3 +87,13 @@ export interface PlayitAuditEntry {
   success: boolean;
   details?: string;
 }
+
+export interface SavedPlayitAgent {
+  id: string;
+  name: string;
+  secretKey: string;
+  createdAt: string;
+  lastUsedAt?: string;
+  notes?: string;
+}
+

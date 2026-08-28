@@ -36,6 +36,8 @@ router.post("/webhook/github-update", async (req, res) => {
   }, 1000);
 });
 
+import { detectEnvironment } from "../services/environmentDetector.js";
+
 router.use("/auth", authRoutes);
 router.use("/servers", serverRoutes);
 router.use("/system", systemRoutes);
@@ -44,6 +46,18 @@ router.use("/nodes", nodeRoutes);
 
 router.get("/settings", async (req, res) => {
   const settings = await readJSON("settings.json") || {};
+  let envInfo;
+  try {
+    envInfo = await detectEnvironment();
+  } catch (e) {
+    envInfo = null;
+  }
+
+  const defaultRuntime = settings.defaultRuntime || 
+    process.env.DEFAULT_RUNTIME || 
+    envInfo?.recommendedRuntime || 
+    "local";
+
   res.json({ 
     panelName: settings.panelName || "JTG Panel",
     panelLogo: settings.panelLogo || "",
@@ -54,6 +68,8 @@ router.get("/settings", async (req, res) => {
     enableLoginAnimation: settings.enableLoginAnimation !== undefined ? settings.enableLoginAnimation : true,
     enableRegistration: settings.enableRegistration !== undefined ? settings.enableRegistration : true,
     theme: settings.theme || "red",
+    buttonColor: settings.buttonColor || "theme",
+    uiTheme: settings.uiTheme || "dark",
     enableGoogleLogin: settings.enableGoogleLogin !== undefined ? settings.enableGoogleLogin : false,
     firebaseApiKey: settings.firebaseApiKey || "",
     firebaseAuthDomain: settings.firebaseAuthDomain || "",
@@ -61,7 +77,8 @@ router.get("/settings", async (req, res) => {
     firebaseStorageBucket: settings.firebaseStorageBucket || "",
     firebaseMessagingSenderId: settings.firebaseMessagingSenderId || "",
     firebaseAppId: settings.firebaseAppId || "",
-    defaultRuntime: settings.defaultRuntime || process.env.DEFAULT_RUNTIME || "docker",
+    defaultRuntime: defaultRuntime,
+    environment: envInfo,
     runtimeLocked: settings.runtimeLocked !== undefined ? settings.runtimeLocked : (process.env.PANEL_RUNTIME_LOCKED === "true" || process.env.PANEL_RUNTIME_LOCKED === "1"),
     isDev: process.env.NODE_ENV === "development" || process.env.PORT === "30000" || process.env.PANEL_DEV_MODE === "true" || process.env.DEV_MODE === "true",
     playitServiceMode: settings.playitServiceMode || "managed_process",

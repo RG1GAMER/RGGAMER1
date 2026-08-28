@@ -19,16 +19,20 @@ export function GlobalBackground() {
 
   if (!panelBackgroundImage) return null;
 
+  const isSolidWhite = panelBackgroundImage === 'solid-white';
+
   return (
     <div 
       className="fixed inset-0 z-0 pointer-events-none bg-cover bg-center bg-no-repeat transition-all duration-500"
       style={{ 
-        backgroundImage: `url("${panelBackgroundImage}")`,
+        backgroundImage: isSolidWhite 
+          ? 'linear-gradient(135deg, #ffffff 0%, #f4f4f6 40%, #e2e8f0 100%)' 
+          : `url("${panelBackgroundImage}")`,
         filter: `blur(${panelBackgroundBlur || 0}px)`,
         transform: 'scale(1.08)', // To prevent blurred edges from showing
       }}
     >
-      <div className="absolute inset-0 bg-zinc-950/40 backdrop-brightness-75" /> {/* Dark overlay for readability */}
+      <div className={isSolidWhite ? "absolute inset-0 bg-zinc-950/30 backdrop-brightness-90" : "absolute inset-0 bg-zinc-950/40 backdrop-brightness-75"} />
     </div>
   );
 }

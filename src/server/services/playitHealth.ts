@@ -12,7 +12,8 @@ import {
   PlayitSettingsConfig,
   PlayitDiagnostics,
   PlayitHealthRecord,
-  PlayitAuditEntry
+  PlayitAuditEntry,
+  SavedPlayitAgent
 } from "../../types/playit.js";
 
 const execAsync = promisify(exec);
@@ -556,6 +557,153 @@ export const resetPlayitAgent = async (
     });
   });
 };
+
+/**
+ * Connect a specific Playit Agent Secret Key (custom agent linking)
+ */
+export const setPlayitAgentSecret = async (
+  server: any,
+  secretKey: string,
+  config?: PlayitSettingsConfig
+): Promise<{ success: boolean; error?: string }> => {
+  const resolvedConfig = config || (await getPlayitSettings());
+  const serverDir = path.join(DATA_DIR, "servers", server.id);
+  await fs.ensureDir(serverDir);
+  const secretPath = path.join(serverDir, "playit.toml");
+  const pm2Name = getPm2ProcessName(server);
+
+  try {
+    let tomlContent = "";
+    const cleanSecret = (secretKey || "").trim();
+    if (!cleanSecret) {
+      return { success: false, error: "Playit Secret Key cannot be empty." };
+    }
+
+    if (cleanSecret.includes("secret_key") || cleanSecret.includes("[")) {
+      tomlContent = cleanSecret;
+    } else {
+      tomlContent = `# Playit.gg Secret Key Configuration\nsecret_key = "${cleanSecret}"\n`;
+    }
+    await fs.writeFile(secretPath, tomlContent, "utf8");
+  } catch (err: any) {
+    return { success: false, error: `Failed to write playit.toml: ${err.message}` };
+  }
+
+  // Stop previous process if running
+  await stopPlayitAgent(server, resolvedConfig);
+
+  // Flush pm2 logs if in managed mode
+  if (resolvedConfig.playitServiceMode !== "systemd") {
+    try {
+      await execAsync(`npx pm2 flush ${pm2Name} || true`);
+    } catch {}
+  }
+
+  // Start agent with new secret
+  return await startPlayitAgent(server, resolvedConfig);
+};
+
+/**
+ * Get the current secret key info for a server
+ */
+export const getPlayitAgentSecret = async (
+  server: any
+): Promise<{ secretKey: string | null; isConfigured: boolean; maskedKey: string | null }> => {
+  const serverDir = path.join(DATA_DIR, "servers", server.id);
+  const secretPath = path.join(serverDir, "playit.toml");
+  try {
+    if (await fs.pathExists(secretPath)) {
+      const content = await fs.readFile(secretPath, "utf8");
+      const match = content.match(/secret_key\s*=\s*["']?([^"'\s\n\r]+)["']?/i);
+      const key = match ? match[1] : null;
+      if (key) {
+        const maskedKey = key.length > 8 ? `${key.substring(0, 4)}••••••••${key.substring(key.length - 4)}` : "••••••••";
+        return { secretKey: key, isConfigured: true, maskedKey };
+      }
+      return { secretKey: null, isConfigured: true, maskedKey: "Custom TOML Config" };
+    }
+  } catch {}
+  return { secretKey: null, isConfigured: false, maskedKey: null };
+};
+
+/**
+ * Get list of saved agent profiles for a server
+ */
+export const getSavedPlayitAgents = async (serverId: string): Promise<SavedPlayitAgent[]> => {
+  const serverDir = path.join(DATA_DIR, "servers", serverId);
+  const profilesPath = path.join(serverDir, "playit-agents.json");
+  try {
+    if (await fs.pathExists(profilesPath)) {
+      return await fs.readJSON(profilesPath);
+    }
+  } catch {}
+  return [];
+};
+
+/**
+ * Save or update an agent profile for a server
+ */
+export const savePlayitAgentProfile = async (
+  serverId: string,
+  profile: { id?: string; name: string; secretKey: string; notes?: string }
+): Promise<SavedPlayitAgent[]> => {
+  const serverDir = path.join(DATA_DIR, "servers", serverId);
+  await fs.ensureDir(serverDir);
+  const profilesPath = path.join(serverDir, "playit-agents.json");
+  let agents: SavedPlayitAgent[] = [];
+  try {
+    if (await fs.pathExists(profilesPath)) {
+      agents = await fs.readJSON(profilesPath);
+    }
+  } catch {}
+
+  const cleanSecret = (profile.secretKey || "").trim();
+  const agentName = (profile.name || "Default Agent").trim();
+
+  const existingIdx = profile.id ? agents.findIndex((a) => a.id === profile.id) : -1;
+  if (existingIdx !== -1) {
+    agents[existingIdx] = {
+      ...agents[existingIdx],
+      name: agentName,
+      secretKey: cleanSecret || agents[existingIdx].secretKey,
+      notes: profile.notes !== undefined ? profile.notes : agents[existingIdx].notes
+    };
+  } else {
+    const newAgent: SavedPlayitAgent = {
+      id: `agent_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: agentName,
+      secretKey: cleanSecret,
+      createdAt: new Date().toISOString(),
+      notes: profile.notes
+    };
+    agents.push(newAgent);
+  }
+
+  await fs.writeJSON(profilesPath, agents, { spaces: 2 });
+  return agents;
+};
+
+/**
+ * Delete a saved agent profile
+ */
+export const deleteSavedPlayitAgentProfile = async (
+  serverId: string,
+  agentId: string
+): Promise<SavedPlayitAgent[]> => {
+  const serverDir = path.join(DATA_DIR, "servers", serverId);
+  const profilesPath = path.join(serverDir, "playit-agents.json");
+  let agents: SavedPlayitAgent[] = [];
+  try {
+    if (await fs.pathExists(profilesPath)) {
+      agents = await fs.readJSON(profilesPath);
+    }
+  } catch {}
+
+  agents = agents.filter((a) => a.id !== agentId);
+  await fs.writeJSON(profilesPath, agents, { spaces: 2 });
+  return agents;
+};
+
 
 /**
  * Calculate next backoff timestamp in ISO format

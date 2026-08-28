@@ -7,10 +7,21 @@ import util from "util";
 const execPromise = util.promisify(exec);
 import { readJSON, writeJSON } from "../services/db.js";
 import bcrypt from "bcryptjs";
+import { detectEnvironment } from "../services/environmentDetector.js";
 
 const router = express.Router();
 
 router.use(requireAuth);
+
+router.get("/environment", async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === "true";
+    const envInfo = await detectEnvironment(forceRefresh);
+    res.json(envInfo);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to detect environment", details: err?.message || err });
+  }
+});
 
 router.get("/versions", async (req, res) => {
   const type = (req.query.type as string) || "PAPER";
@@ -243,7 +254,7 @@ router.put("/settings", async (req, res) => {
   if(user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden"});
   const { 
     panelName, panelLogo, panelBackgroundImage, panelBackgroundBlur, 
-    enablePlayit, enableTutorial, enableLoginAnimation, enableRegistration, theme,
+    enablePlayit, enableTutorial, enableLoginAnimation, enableRegistration, theme, buttonColor, uiTheme,
     enableGoogleLogin, firebaseApiKey, firebaseAuthDomain, firebaseProjectId,
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, defaultRuntime,
     playitServiceMode, playitServiceName, healthCheckIntervalMinutes,
@@ -280,6 +291,8 @@ router.put("/settings", async (req, res) => {
   if (enableLoginAnimation !== undefined) settings.enableLoginAnimation = enableLoginAnimation;
   if (enableRegistration !== undefined) settings.enableRegistration = enableRegistration;
   if (theme !== undefined) settings.theme = theme;
+  if (buttonColor !== undefined) settings.buttonColor = buttonColor;
+  if (uiTheme !== undefined) settings.uiTheme = uiTheme;
   if (enableGoogleLogin !== undefined) settings.enableGoogleLogin = enableGoogleLogin;
   if (firebaseApiKey !== undefined) settings.firebaseApiKey = firebaseApiKey;
   if (firebaseAuthDomain !== undefined) settings.firebaseAuthDomain = firebaseAuthDomain;

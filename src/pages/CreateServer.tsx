@@ -1036,44 +1036,50 @@ export default function CreateServer() {
                   />
                   <p className="text-[11px] text-[#4c4c4c] mt-2 mb-6 font-mono">Optional domain hostname to display on dashboard.</p>
 
-                  {isDev && (
-                    <div className="mt-4 pt-4 border-t border-[#232323]">
-                      <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                        <Cpu className="w-4 h-4" /> Execution Runtime
+                  <div className="mt-4 pt-4 border-t border-[#232323]">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <label className="flex items-center gap-2 text-sm text-[#8f8f8f]">
+                        <Cpu className="w-4 h-4" /> Execution Runtime Engine
                       </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => updateState('runtimeType', 'docker')}
-                          className={`sel-card p-4 text-left flex flex-col justify-between ${state.runtimeType === 'docker' ? 'selected' : ''}`}
-                        >
-                          <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
-                          <div>
-                            <div className="font-display font-bold text-sm text-white flex items-center gap-2">
-                              Docker Container
-                              {state.runtimeType === 'docker' && <span className="text-[9px] bg-theme-500 text-white px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
-                            </div>
-                            <div className="text-[11px] text-[#8f8f8f] mt-1">Isolated sandbox container with resource enforcement.</div>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateState('runtimeType', 'local')}
-                          className={`sel-card p-4 text-left flex flex-col justify-between ${state.runtimeType === 'local' ? 'selected' : ''}`}
-                        >
-                          <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
-                          <div>
-                            <div className="font-display font-bold text-sm text-white flex items-center gap-2">
-                              Local Process
-                              {state.runtimeType === 'local' && <span className="text-[9px] bg-amber-500 text-black px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
-                            </div>
-                            <div className="text-[11px] text-[#8f8f8f] mt-1">Direct OS process execution.</div>
-                          </div>
-                        </button>
-                      </div>
+                      <span className="text-[10px] font-mono bg-theme-500/20 text-theme-400 border border-theme-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
+                        Auto-Configured
+                      </span>
                     </div>
-                  )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        disabled={runtimeLocked}
+                        onClick={() => updateState('runtimeType', 'docker')}
+                        className={`sel-card p-4 text-left flex flex-col justify-between ${state.runtimeType === 'docker' ? 'selected' : ''} ${runtimeLocked && state.runtimeType !== 'docker' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
+                        <div>
+                          <div className="font-display font-bold text-sm text-white flex items-center gap-2">
+                            Docker Container
+                            {state.runtimeType === 'docker' && <span className="text-[9px] bg-theme-500 text-white px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
+                          </div>
+                          <div className="text-[11px] text-[#8f8f8f] mt-1">Isolated sandbox container with resource enforcement & port virtualization.</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={runtimeLocked}
+                        onClick={() => updateState('runtimeType', 'local')}
+                        className={`sel-card p-4 text-left flex flex-col justify-between ${state.runtimeType === 'local' ? 'selected' : ''} ${runtimeLocked && state.runtimeType !== 'local' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      >
+                        <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
+                        <div>
+                          <div className="font-display font-bold text-sm text-white flex items-center gap-2">
+                            Local Process (Direct)
+                            {state.runtimeType === 'local' && <span className="text-[9px] bg-amber-500 text-black px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
+                          </div>
+                          <div className="text-[11px] text-[#8f8f8f] mt-1">Native OS execution with auto-installed OpenJDK JRE. Zero Docker dependency.</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
