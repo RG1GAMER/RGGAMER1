@@ -14,7 +14,7 @@ import { SOFTWARE_CATALOG, SOFTWARE_BUILDS_MAP, SoftwareItem } from "../componen
 
 const pageStyles = `
   .deploy-theme {
-    background: #050505; color: #fff; font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg-background); color: var(--text-foreground); font-family: 'IBM Plex Sans', sans-serif;
     min-height: 100vh;
   }
   .deploy-theme .font-display { font-family: 'Chakra Petch', sans-serif; }
@@ -22,63 +22,70 @@ const pageStyles = `
   
   .deploy-theme .bg-grid {
     position: fixed; inset: 0; z-index: 0; pointer-events: none;
-    background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-image: linear-gradient(var(--border-border-subtle) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--border-border-subtle) 1px, transparent 1px);
     background-size: 56px 56px;
     mask-image: radial-gradient(ellipse 95% 70% at 50% 0%, #000 25%, transparent 78%);
     -webkit-mask-image: radial-gradient(ellipse 95% 70% at 50% 0%, #000 25%, transparent 78%);
   }
   .deploy-theme .scanline {
     position: fixed; left: 0; right: 0; height: 140px; top: -140px; z-index: 1; pointer-events: none;
-    background: linear-gradient(to bottom, transparent, rgba(255,255,255,.028), transparent);
+    background: linear-gradient(to bottom, transparent, var(--border-border-subtle), transparent);
     animation: scan 10s linear infinite;
   }
   @keyframes scan { to { top: 100vh; } }
   .deploy-theme .noise {
-    position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: .035;
+    position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: .025;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   
   .deploy-theme .corner { position: absolute; width: 12px; height: 12px; }
-  .deploy-theme .c-tl { top: -1px; left: -1px; border-top: 2px solid #fff; border-left: 2px solid #fff; }
-  .deploy-theme .c-tr { top: -1px; right: -1px; border-top: 2px solid #fff; border-right: 2px solid #fff; }
-  .deploy-theme .c-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #fff; border-left: 2px solid #fff; }
-  .deploy-theme .c-br { bottom: -1px; right: -1px; border-bottom: 2px solid #fff; border-right: 2px solid #fff; }
+  .deploy-theme .c-tl { top: -1px; left: -1px; border-top: 2px solid var(--theme-500); border-left: 2px solid var(--theme-500); }
+  .deploy-theme .c-tr { top: -1px; right: -1px; border-top: 2px solid var(--theme-500); border-right: 2px solid var(--theme-500); }
+  .deploy-theme .c-bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--theme-500); border-left: 2px solid var(--theme-500); }
+  .deploy-theme .c-br { bottom: -1px; right: -1px; border-bottom: 2px solid var(--theme-500); border-right: 2px solid var(--theme-500); }
 
   .deploy-theme .inp {
-    width: 100%; background: #0e0e0e; border: 1px solid #232323; padding: .85rem 1rem; color: #fff; outline: none; transition: border-color .25s, box-shadow .25s; font-size: .95rem;
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border-border); padding: .85rem 1rem; color: var(--text-foreground); outline: none; transition: border-color .25s, box-shadow .25s; font-size: .95rem; border-radius: 0.5rem;
   }
-  .deploy-theme .inp::placeholder { color: #4c4c4c; }
-  .deploy-theme .inp:focus { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+  .deploy-theme .inp::placeholder { color: var(--text-muted-foreground); opacity: 0.6; }
+  .deploy-theme .inp:focus { border-color: var(--theme-500); box-shadow: 0 0 0 2px color-mix(in srgb, var(--theme-500) 25%, transparent); }
   
   .deploy-theme .sel-card {
-    position: relative; background: #0e0e0e; border: 1px solid #232323; cursor: pointer; transition: all .28s cubic-bezier(.16,1,.3,1); overflow: hidden;
+    position: relative; background: var(--bg-card); border: 1px solid var(--border-border); cursor: pointer; transition: all .28s cubic-bezier(.16,1,.3,1); overflow: hidden; border-radius: 0.75rem;
   }
-  .deploy-theme .sel-card:hover { transform: translateY(-3px); border-color: #5a5a5a; }
-  .deploy-theme .sel-card.selected { border-color: #fff; background: #131313; box-shadow: 0 0 0 1px #fff, 0 14px 40px -14px rgba(255,255,255,.25); }
+  .deploy-theme .sel-card:hover { transform: translateY(-3px); border-color: var(--theme-500); }
+  .deploy-theme .sel-card.selected { border-color: var(--theme-500); background: color-mix(in srgb, var(--theme-500) 10%, var(--bg-card)); box-shadow: 0 0 0 1px var(--theme-500), 0 14px 40px -14px color-mix(in srgb, var(--theme-500) 30%, transparent); }
   .deploy-theme .sel-card .tick {
-    position: absolute; top: 8px; right: 8px; width: 18px; height: 18px; background: #fff; color: #000; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.3); transition: all .3s cubic-bezier(.34,1.56,.64,1);
+    position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 9999px; background: var(--theme-500); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transform: scale(.3); transition: all .3s cubic-bezier(.34,1.56,.64,1);
   }
   .deploy-theme .sel-card.selected .tick { opacity: 1; transform: scale(1); }
-  .deploy-theme .soft-card .ic { color: #4c4c4c; transition: all .3s; }
-  .deploy-theme .soft-card:hover .ic { color: #cfcfcf; }
-  .deploy-theme .soft-card.selected .ic { color: #fff; filter: drop-shadow(0 0 8px rgba(255,255,255,.5)); }
+  .deploy-theme .soft-card .ic { color: var(--text-muted-foreground); transition: all .3s; }
+  .deploy-theme .soft-card:hover .ic { color: var(--text-foreground); }
+  .deploy-theme .soft-card.selected .ic { color: var(--theme-400); filter: drop-shadow(0 0 8px color-mix(in srgb, var(--theme-500) 50%, transparent)); }
 
-  .deploy-theme .btn-white { position: relative; overflow: hidden; background: #fff; color: #000; }
-  .deploy-theme .btn-white::before { content: ''; position: absolute; inset: 0; background: #000; transform: translateY(101%); transition: transform .35s cubic-bezier(.16,1,.3,1); }
-  .deploy-theme .btn-white:hover:not(:disabled)::before { transform: translateY(0); }
-  .deploy-theme .btn-white > * { position: relative; z-index: 1; transition: color .35s; }
-  .deploy-theme .btn-white:hover:not(:disabled) > * { color: #fff; }
-  .deploy-theme .btn-white:disabled { opacity: .35; cursor: not-allowed; }
+  .deploy-theme .btn-primary-action { 
+    position: relative; overflow: hidden; 
+    background: var(--btn-color-600, var(--theme-600)); 
+    color: var(--btn-color-text, #ffffff); 
+    border-radius: 0.5rem;
+    transition: all 0.25s ease;
+  }
+  .deploy-theme .btn-primary-action:hover:not(:disabled) { 
+    background: var(--btn-color-500, var(--theme-500));
+    box-shadow: 0 10px 25px -5px color-mix(in srgb, var(--btn-color-500, var(--theme-500)) 40%, transparent);
+    transform: translateY(-1px);
+  }
+  .deploy-theme .btn-primary-action:disabled { opacity: .4; cursor: not-allowed; }
   
-  .deploy-theme .btn-ghost { background: transparent; border: 1px solid #232323; color: #8f8f8f; transition: all .25s; }
-  .deploy-theme .btn-ghost:hover:not(:disabled) { border-color: #fff; color: #fff; }
+  .deploy-theme .btn-ghost { background: var(--bg-muted); border: 1px solid var(--border-border); color: var(--text-muted-foreground); transition: all .25s; border-radius: 0.5rem; }
+  .deploy-theme .btn-ghost:hover:not(:disabled) { border-color: var(--theme-500); color: var(--text-foreground); background: var(--bg-muted-hover); }
   .deploy-theme .btn-ghost:disabled { opacity: .3; cursor: not-allowed; }
 
-  .deploy-theme .dot { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border: 1px solid #232323; background: #0b0b0b; font-size: 12px; color: #4c4c4c; transition: all .35s cubic-bezier(.16,1,.3,1); }
-  .deploy-theme .dot.active { border-color: #fff; color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 22px -4px rgba(255,255,255,.5); }
-  .deploy-theme .dot.done { background: #fff; color: #000; border-color: #fff; }
-  .deploy-theme .conn-fill { height: 100%; background: #fff; width: 0; transition: width .5s cubic-bezier(.16,1,.3,1); }
+  .deploy-theme .dot { width: 38px; height: 38px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-border); background: var(--bg-card); font-size: 12px; color: var(--text-muted-foreground); transition: all .35s cubic-bezier(.16,1,.3,1); }
+  .deploy-theme .dot.active { border-color: var(--theme-500); color: var(--theme-400); background: color-mix(in srgb, var(--theme-500) 15%, var(--bg-card)); box-shadow: 0 0 0 1px var(--theme-500), 0 0 22px -4px color-mix(in srgb, var(--theme-500) 50%, transparent); }
+  .deploy-theme .dot.done { background: var(--theme-500); color: #ffffff; border-color: var(--theme-500); }
+  .deploy-theme .conn-fill { height: 100%; background: var(--theme-500); width: 0; transition: width .5s cubic-bezier(.16,1,.3,1); }
   
   .deploy-theme .anim-forward { animation: sR .5s cubic-bezier(.16,1,.3,1); }
   .deploy-theme .anim-back { animation: sL .5s cubic-bezier(.16,1,.3,1); }
@@ -86,7 +93,7 @@ const pageStyles = `
   @keyframes sL { from { opacity: 0; transform: translateX(-46px); } to { opacity: 1; transform: translateX(0); } }
   
   .deploy-theme .pulse-dot { animation: pd 2.4s infinite; }
-  @keyframes pd { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,.35); } 50% { box-shadow: 0 0 0 6px rgba(255,255,255,0); } }
+  @keyframes pd { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--theme-500) 50%, transparent); } 50% { box-shadow: 0 0 0 6px rgba(0,0,0,0); } }
 `;
 
 const RAM = [
@@ -132,29 +139,29 @@ function CustomDropdown({ value, options, onChange, renderValue, renderOption, p
       <button 
         type="button" 
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 inp text-left !py-3 bg-[#0e0e0e]"
+        className="w-full flex items-center justify-between gap-3 inp text-left !py-3"
       >
         <span className="flex items-center gap-3 min-w-0">
-          {selected ? renderValue(selected) : <span className="text-[#4c4c4c]">{placeholder}</span>}
+          {selected ? renderValue(selected) : <span className="text-muted-foreground">{placeholder}</span>}
         </span>
-        <ChevronDown className={`w-4 h-4 text-[#4c4c4c] transition-transform duration-300 shrink-0 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-300 shrink-0 ${open ? 'rotate-180' : ''}`} />
       </button>
       
       {open && (
-        <div className="absolute z-50 mt-2 w-full bg-[#0b0b0b] border border-[#232323] shadow-2xl shadow-black/70">
-          <div className="p-2 border-b border-[#232323]">
+        <div className="absolute z-50 mt-2 w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden backdrop-blur-xl">
+          <div className="p-2 border-b border-border bg-muted/40">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#4c4c4c]" />
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input 
                 autoFocus
-                className="w-full bg-[#050505] border border-[#232323] pl-8 pr-2 py-2 text-sm outline-none focus:border-white transition-colors text-white" 
+                className="w-full bg-background border border-border pl-8 pr-2 py-2 text-sm outline-none focus:border-theme-500 rounded-lg transition-colors text-foreground" 
                 placeholder="Search..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
           </div>
-          <div className="max-h-52 overflow-y-auto p-1">
+          <div className="max-h-52 overflow-y-auto p-1 custom-scrollbar">
             {filtered.length > 0 ? filtered.map((o: any, i: number) => {
                const val = o.value || o.v;
                const isSel = val === value;
@@ -163,7 +170,7 @@ function CustomDropdown({ value, options, onChange, renderValue, renderOption, p
                    {renderOption(o, isSel)}
                  </div>
                );
-            }) : <p className="px-3 py-3 text-[11px] text-[#4c4c4c] font-mono">NO RESULTS</p>}
+            }) : <p className="px-3 py-3 text-[11px] text-muted-foreground font-mono">NO RESULTS</p>}
           </div>
         </div>
       )}
@@ -484,9 +491,9 @@ export default function CreateServer() {
   };
 
   const renderReviewRow = (k: string, v: string) => (
-    <div className="flex items-center justify-between gap-4 px-4 py-3">
-      <span className="text-[#4c4c4c] tracking-widest text-[11px] font-mono">{k}</span>
-      <span className="text-white text-right truncate font-mono">{v}</span>
+    <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border last:border-0">
+      <span className="text-muted-foreground tracking-widest text-[11px] font-mono">{k}</span>
+      <span className="text-foreground text-right truncate font-mono font-medium">{v}</span>
     </div>
   );
 
@@ -504,29 +511,29 @@ export default function CreateServer() {
       {/* Progress Line */}
       <div 
         style={{ 
-          position: 'fixed', top: 0, left: 0, height: '2px', width: '100%', zIndex: 100, 
-          background: '#fff', transformOrigin: 'left', 
+          position: 'fixed', top: 0, left: 0, height: '3px', width: '100%', zIndex: 100, 
+          background: 'var(--theme-500)', transformOrigin: 'left', 
           transform: `scaleX(${(currentStep + 1) / STEPS.length})`, 
-          boxShadow: '0 0 12px rgba(255,255,255,.7)', transition: 'transform .5s cubic-bezier(.16,1,.3,1)' 
+          boxShadow: '0 0 12px var(--theme-500)', transition: 'transform .5s cubic-bezier(.16,1,.3,1)' 
         }} 
       />
 
       <div className="relative z-10">
-        <nav className="sticky top-0 z-50 border-b border-[#232323] bg-[#050505]/90 backdrop-blur-md">
+        <nav className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-md">
           <div className="max-w-4xl mx-auto px-5 h-16 flex items-center justify-between">
-            <button onClick={() => navigate('/servers')} className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-[#8f8f8f] hover:text-white transition-colors border border-[#232323] px-3 py-1.5">
+            <button onClick={() => navigate('/servers')} className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-muted-foreground hover:text-foreground transition-colors border border-border hover:border-theme-500 px-3 py-1.5 rounded-lg">
               <ArrowLeft className="w-3.5 h-3.5" /> INSTANCES
             </button>
             <a href="#" onClick={(e) => { e.preventDefault(); navigate('/servers'); }} className="flex items-center gap-3 group">
               {panelLogo ? (
                 <img src={panelLogo} alt={pName} className="w-7 h-7 object-contain rounded" />
               ) : (
-                <div className="w-7 h-7 bg-white flex items-center justify-center group-hover:rotate-45 transition-transform duration-500">
-                  <div className="w-3.5 h-3.5 bg-black"></div>
+                <div className="w-7 h-7 bg-theme-600 rounded-md flex items-center justify-center group-hover:rotate-45 transition-transform duration-500 text-white font-bold text-xs shadow-md shadow-theme-500/20">
+                  <div className="w-3 h-3 bg-white rounded-sm"></div>
                 </div>
               )}
-              <span className="font-display font-bold text-lg tracking-wide uppercase text-white">
-                {firstWord} {restWords && <span className="text-[#8f8f8f] font-medium">{restWords}</span>}
+              <span className="font-display font-bold text-lg tracking-wide uppercase text-foreground">
+                {firstWord} {restWords && <span className="text-muted-foreground font-medium">{restWords}</span>}
               </span>
             </a>
           </div>
@@ -534,10 +541,10 @@ export default function CreateServer() {
 
         <main className="max-w-4xl mx-auto px-5 pt-10 pb-16">
           <header className="mb-8">
-            <p className="font-mono text-[11px] tracking-[0.3em] text-[#4c4c4c] mb-2 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-white rounded-full pulse-dot"></span> NEW CONTAINER
+            <p className="font-mono text-[11px] tracking-[0.3em] text-muted-foreground mb-2 flex items-center gap-2">
+              <span className="w-2 h-2 bg-theme-500 rounded-full pulse-dot"></span> NEW CONTAINER
             </p>
-            <h1 className="font-display font-bold tracking-tight text-3xl md:text-4xl">DEPLOY INSTANCE</h1>
+            <h1 className="font-display font-bold tracking-tight text-3xl md:text-4xl text-foreground">DEPLOY INSTANCE</h1>
           </header>
 
           {/* Stepper (1 2 3 4 5 6) */}
@@ -553,12 +560,12 @@ export default function CreateServer() {
                     >
                       {i < currentStep ? <Check className="w-4 h-4 stroke-[3]" /> : String(i + 1).padStart(2, '0')}
                     </button>
-                    <span className="mt-2 font-mono text-[9px] tracking-widest text-[#4c4c4c] text-center uppercase font-bold">
+                    <span className={`mt-2 font-mono text-[9px] tracking-widest text-center uppercase font-bold ${i === currentStep ? 'text-theme-400 font-extrabold' : i < currentStep ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {s}
                     </span>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div className="flex-1 h-px bg-[#232323] mt-[19px] mx-1">
+                    <div className="flex-1 h-0.5 bg-border mt-[19px] mx-1 overflow-hidden rounded-full">
                       <div className="conn-fill" style={{ width: i < currentStep ? '100%' : '0%' }}></div>
                     </div>
                   )}
@@ -568,7 +575,7 @@ export default function CreateServer() {
           </div>
 
           {/* Step Body */}
-          <div className="relative border border-[#232323] bg-[#0b0b0b] p-6 md:p-9 mt-4">
+          <div className="relative border border-border bg-card/75 backdrop-blur-xl p-6 md:p-9 mt-4 rounded-2xl shadow-xl">
             <span className="corner c-tl"></span><span className="corner c-tr"></span>
             <span className="corner c-bl"></span><span className="corner c-br"></span>
 
@@ -578,17 +585,17 @@ export default function CreateServer() {
               {currentStep === 0 && (
                 <div className="step-content">
                   <div className="flex items-center gap-3 mb-6">
-                    <span className="font-mono text-xs text-[#4c4c4c]">01</span>
-                    <h2 className="font-display font-bold tracking-wide text-sm">SERVER IDENTITY & DETAILS</h2>
-                    <span className="flex-1 h-px bg-[#232323]"></span>
+                    <span className="font-mono text-xs text-theme-400 font-bold">01</span>
+                    <h2 className="font-display font-bold tracking-wide text-sm text-foreground">SERVER IDENTITY & DETAILS</h2>
+                    <span className="flex-1 h-px bg-border"></span>
                   </div>
                   
-                  <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                    <Server className="w-4 h-4" /> Instance Name <span className="text-white">*</span>
+                  <label className="flex items-center gap-2 text-sm text-foreground/90 font-medium mb-2.5">
+                    <Server className="w-4 h-4 text-theme-400" /> Instance Name <span className="text-theme-500">*</span>
                   </label>
                   <input 
                     type="text" 
-                    className={`inp ${nameError ? 'border-theme-500' : ''}`} 
+                    className={`inp ${nameError ? 'border-theme-500 ring-2 ring-theme-500/20' : ''}`} 
                     placeholder="e.g. Survival SMP" 
                     value={state.name}
                     onChange={(e) => { updateState('name', e.target.value); setNameError(false); }}
@@ -600,8 +607,8 @@ export default function CreateServer() {
                     </p>
                   )}
 
-                  <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5 mt-7">
-                    <AlignLeft className="w-4 h-4" /> Description
+                  <label className="flex items-center gap-2 text-sm text-foreground/90 font-medium mb-2.5 mt-7">
+                    <AlignLeft className="w-4 h-4 text-theme-400" /> Description
                   </label>
                   <textarea 
                     className="inp" 
@@ -610,13 +617,13 @@ export default function CreateServer() {
                     value={state.desc}
                     onChange={(e) => updateState('desc', e.target.value)}
                   />
-                  <p className="text-[11px] text-[#4c4c4c] mt-2 mb-7 font-mono">Helps identify this server in your panel.</p>
+                  <p className="text-[11px] text-muted-foreground mt-2 mb-7 font-mono">Helps identify this server in your panel.</p>
 
                   {(user?.role === "admin" || user?.role === "owner") && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4 pt-4 border-t border-[#232323]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4 pt-4 border-t border-border">
                       <div>
-                        <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                          <User className="w-4 h-4" /> Server Owner
+                        <label className="flex items-center gap-2 text-sm text-foreground/90 font-medium mb-2.5">
+                          <User className="w-4 h-4 text-theme-400" /> Server Owner
                         </label>
                         <CustomDropdown
                           value={state.owner}
@@ -624,20 +631,20 @@ export default function CreateServer() {
                           onChange={(v: string) => updateState('owner', v)}
                           placeholder="Select an owner..."
                           renderValue={(o: any) => (
-                            <span className="truncate text-white font-mono text-sm">{o.name} <span className="text-[#8f8f8f]">({o.tag})</span></span>
+                            <span className="truncate text-foreground font-mono text-sm">{o.name} <span className="text-muted-foreground">({o.tag})</span></span>
                           )}
                           renderOption={(o: any, sel: boolean) => (
-                            <button type="button" className={`w-full flex items-center justify-between px-3 py-2.5 text-left font-mono ${sel ? 'bg-white/5 text-white' : 'hover:bg-white/5 text-slate-300'}`}>
+                            <button type="button" className={`w-full flex items-center justify-between px-3 py-2.5 text-left font-mono rounded-lg transition-colors ${sel ? 'bg-theme-500/15 text-theme-300 font-bold' : 'hover:bg-muted text-foreground'}`}>
                               <span className="text-sm">{o.name} ({o.tag})</span>
-                              {sel && <Check className="w-4 h-4 text-white" />}
+                              {sel && <Check className="w-4 h-4 text-theme-400" />}
                             </button>
                           )}
                         />
                       </div>
 
                       <div>
-                        <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                          <Radio className="w-4 h-4" /> Target Node
+                        <label className="flex items-center gap-2 text-sm text-foreground/90 font-medium mb-2.5">
+                          <Radio className="w-4 h-4 text-theme-400" /> Target Node
                         </label>
                         <CustomDropdown
                           value={state.node}
@@ -645,12 +652,12 @@ export default function CreateServer() {
                           onChange={(v: string) => updateState('node', v)}
                           placeholder="Select a node..."
                           renderValue={(o: any) => (
-                            <span className="text-white truncate font-mono text-sm">{o.label}</span>
+                            <span className="text-foreground truncate font-mono text-sm">{o.label}</span>
                           )}
                           renderOption={(o: any, sel: boolean) => (
-                            <button type="button" className={`w-full flex items-center justify-between px-3 py-2.5 font-mono text-sm transition-colors ${sel ? 'text-white bg-white/5' : 'text-[#8f8f8f] hover:bg-white/5'}`}>
+                            <button type="button" className={`w-full flex items-center justify-between px-3 py-2.5 font-mono text-sm rounded-lg transition-colors ${sel ? 'text-theme-300 bg-theme-500/15 font-bold' : 'text-foreground hover:bg-muted'}`}>
                               <span>{o.label}</span>
-                              {sel && <Check className="w-4 h-4 text-white" />}
+                              {sel && <Check className="w-4 h-4 text-theme-400" />}
                             </button>
                           )}
                         />
@@ -660,24 +667,24 @@ export default function CreateServer() {
                 </div>
               )}
 
-              {/* STEP 2 (Index 1): SOFTWARE (Image 1 & 2) */}
+              {/* STEP 2 (Index 1): SOFTWARE */}
               {currentStep === 1 && (
                 <div className="step-content space-y-6">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="font-mono text-xs text-[#4c4c4c]">02</span>
-                    <h2 className="font-display font-bold tracking-wide text-sm uppercase">CHOOSE SERVER SOFTWARE</h2>
-                    <span className="flex-1 h-px bg-[#232323]"></span>
+                    <span className="font-mono text-xs text-theme-400 font-bold">02</span>
+                    <h2 className="font-display font-bold tracking-wide text-sm uppercase text-foreground">CHOOSE SERVER SOFTWARE</h2>
+                    <span className="flex-1 h-px bg-border"></span>
                   </div>
 
                   {/* Software Edition Tabs */}
-                  <div className="flex items-center gap-2 border-b border-[#232323] pb-3">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
                     <button
                       type="button"
                       onClick={() => setSoftwareTab('java')}
                       className={`px-4 py-2 text-xs font-mono font-bold tracking-wider rounded-lg transition-all ${
                         softwareTab === 'java' 
-                          ? 'bg-white text-black' 
-                          : 'bg-[#111] text-[#8f8f8f] hover:text-white border border-[#232323]'
+                          ? 'bg-theme-600 text-white shadow-md shadow-theme-500/20' 
+                          : 'bg-muted text-muted-foreground hover:text-foreground border border-border hover:border-theme-500/40'
                       }`}
                     >
                       JAVA EDITION
@@ -687,8 +694,8 @@ export default function CreateServer() {
                       onClick={() => setSoftwareTab('bedrock')}
                       className={`px-4 py-2 text-xs font-mono font-bold tracking-wider rounded-lg transition-all ${
                         softwareTab === 'bedrock' 
-                          ? 'bg-white text-black' 
-                          : 'bg-[#111] text-[#8f8f8f] hover:text-white border border-[#232323]'
+                          ? 'bg-theme-600 text-white shadow-md shadow-theme-500/20' 
+                          : 'bg-muted text-muted-foreground hover:text-foreground border border-border hover:border-theme-500/40'
                       }`}
                     >
                       BEDROCK EDITION (WIN10/MCPE)
@@ -698,18 +705,18 @@ export default function CreateServer() {
                       onClick={() => setSoftwareTab('other')}
                       className={`px-4 py-2 text-xs font-mono font-bold tracking-wider rounded-lg transition-all ${
                         softwareTab === 'other' 
-                          ? 'bg-white text-black' 
-                          : 'bg-[#111] text-[#8f8f8f] hover:text-white border border-[#232323]'
+                          ? 'bg-theme-600 text-white shadow-md shadow-theme-500/20' 
+                          : 'bg-muted text-muted-foreground hover:text-foreground border border-border hover:border-theme-500/40'
                       }`}
                     >
                       APPS & BOTS
                     </button>
                   </div>
 
-                  {/* TAB 1: Java Edition (Image 1) */}
+                  {/* TAB 1: Java Edition */}
                   {softwareTab === 'java' && (
                     <div className="space-y-4 pt-1">
-                      <h3 className="text-base sm:text-lg font-bold font-mono text-white">
+                      <h3 className="text-base sm:text-lg font-bold font-mono text-foreground">
                         Java Edition
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-4">
@@ -723,22 +730,22 @@ export default function CreateServer() {
                               onClick={() => handleSelectSoftware(soft.id)}
                               className={`relative group p-5 rounded-xl text-center flex flex-col items-center justify-center border transition-all ${
                                 isSelected 
-                                  ? 'bg-blue-950/60 border-blue-400 shadow-lg shadow-blue-500/20' 
-                                  : 'bg-[#0e0e0e] hover:bg-[#141414] border-[#232323] hover:border-white/40'
+                                  ? 'bg-theme-500/15 border-theme-500 text-theme-300 ring-1 ring-theme-500 shadow-lg shadow-theme-500/20' 
+                                  : 'bg-card hover:bg-muted border-border hover:border-theme-500/40 text-foreground'
                               }`}
                             >
                               {soft.badge && (
-                                <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono font-semibold text-blue-400">
-                                  <Info className="w-3 h-3 text-blue-400" />
+                                <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono font-semibold text-theme-400 bg-theme-500/10 px-1.5 py-0.5 rounded">
+                                  <Info className="w-3 h-3 text-theme-400" />
                                   <span>{soft.badge}</span>
                                 </div>
                               )}
                               
-                              <div className="w-12 h-12 rounded-xl bg-blue-900/30 text-blue-400 flex items-center justify-center mb-2.5">
+                              <div className="w-12 h-12 rounded-xl bg-theme-500/20 text-theme-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
                                 <Icon className="w-7 h-7 stroke-[2]" />
                               </div>
 
-                              <div className="text-sm sm:text-base font-bold font-mono text-blue-300">
+                              <div className={`text-sm sm:text-base font-bold font-mono ${isSelected ? 'text-theme-300' : 'text-foreground'}`}>
                                 {soft.name}
                               </div>
                             </button>
@@ -748,10 +755,10 @@ export default function CreateServer() {
                     </div>
                   )}
 
-                  {/* TAB 2: Bedrock Edition (Image 2) */}
+                  {/* TAB 2: Bedrock Edition */}
                   {softwareTab === 'bedrock' && (
                     <div className="space-y-4 pt-1">
-                      <h3 className="text-base sm:text-lg font-bold font-mono text-white">
+                      <h3 className="text-base sm:text-lg font-bold font-mono text-foreground">
                         Bedrock Edition (Win10/MCPE)
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -765,22 +772,22 @@ export default function CreateServer() {
                               onClick={() => handleSelectSoftware(soft.id)}
                               className={`relative group p-5 rounded-xl text-center flex flex-col items-center justify-center border transition-all ${
                                 isSelected 
-                                  ? 'bg-blue-950/60 border-blue-400 shadow-lg shadow-blue-500/20' 
-                                  : 'bg-[#0e0e0e] hover:bg-[#141414] border-[#232323] hover:border-white/40'
+                                  ? 'bg-theme-500/15 border-theme-500 text-theme-300 ring-1 ring-theme-500 shadow-lg shadow-theme-500/20' 
+                                  : 'bg-card hover:bg-muted border-border hover:border-theme-500/40 text-foreground'
                               }`}
                             >
                               {soft.badge && (
-                                <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono font-semibold text-blue-400">
-                                  <Info className="w-3 h-3 text-blue-400" />
+                                <div className="absolute top-2 right-2 flex items-center gap-1 text-[10px] font-mono font-semibold text-theme-400 bg-theme-500/10 px-1.5 py-0.5 rounded">
+                                  <Info className="w-3 h-3 text-theme-400" />
                                   <span>{soft.badge}</span>
                                 </div>
                               )}
                               
-                              <div className="w-12 h-12 rounded-xl bg-blue-900/30 text-blue-400 flex items-center justify-center mb-2.5">
+                              <div className="w-12 h-12 rounded-xl bg-theme-500/20 text-theme-400 flex items-center justify-center mb-2.5 group-hover:scale-105 transition-transform">
                                 <Icon className="w-7 h-7 stroke-[2]" />
                               </div>
 
-                              <div className="text-sm sm:text-base font-bold font-mono text-blue-300">
+                              <div className={`text-sm sm:text-base font-bold font-mono ${isSelected ? 'text-theme-300' : 'text-foreground'}`}>
                                 {soft.name}
                               </div>
                             </button>
@@ -793,7 +800,7 @@ export default function CreateServer() {
                   {/* TAB 3: Applications & Bots */}
                   {softwareTab === 'other' && (
                     <div className="space-y-4 pt-1">
-                      <h3 className="text-base sm:text-lg font-bold font-mono text-white">
+                      <h3 className="text-base sm:text-lg font-bold font-mono text-foreground">
                         Application & Bot Runtimes
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -807,16 +814,16 @@ export default function CreateServer() {
                               onClick={() => handleSelectSoftware(soft.id)}
                               className={`p-5 rounded-xl text-left flex items-start gap-4 border transition-all ${
                                 isSelected 
-                                  ? 'bg-amber-950/40 border-amber-400 shadow-lg shadow-amber-500/20' 
-                                  : 'bg-[#0e0e0e] hover:bg-[#141414] border-[#232323] hover:border-white/40'
+                                  ? 'bg-theme-500/15 border-theme-500 text-theme-300 ring-1 ring-theme-500 shadow-lg shadow-theme-500/20' 
+                                  : 'bg-card hover:bg-muted border-border hover:border-theme-500/40 text-foreground'
                               }`}
                             >
-                              <div className="w-10 h-10 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+                              <div className="w-10 h-10 rounded-lg bg-theme-500/20 text-theme-400 flex items-center justify-center shrink-0">
                                 <Icon className="w-5 h-5" />
                               </div>
                               <div>
-                                <div className="text-sm font-bold font-mono text-white">{soft.name}</div>
-                                <div className="text-xs text-[#8f8f8f] mt-1 leading-snug">{soft.desc}</div>
+                                <div className="text-sm font-bold font-mono text-foreground">{soft.name}</div>
+                                <div className="text-xs text-muted-foreground mt-1 leading-snug">{soft.desc}</div>
                               </div>
                             </button>
                           );
@@ -827,32 +834,32 @@ export default function CreateServer() {
                 </div>
               )}
 
-              {/* STEP 3 (Index 2): VERSION (Image 3) */}
+              {/* STEP 3 (Index 2): VERSION */}
               {currentStep === 2 && (
                 <div className="step-content space-y-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#232323] pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs text-[#4c4c4c]">03</span>
-                      <h2 className="font-display font-bold tracking-wide text-lg text-white">
+                      <span className="font-mono text-xs text-theme-400 font-bold">03</span>
+                      <h2 className="font-display font-bold tracking-wide text-lg text-foreground">
                         {currentSelectedSoftware.name}
                       </h2>
                     </div>
 
                     {/* Version Search */}
                     <div className="relative w-full sm:w-64">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#4c4c4c]" />
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <input
                         type="text"
                         placeholder="Search version..."
                         value={versionSearch}
                         onChange={(e) => setVersionSearch(e.target.value)}
-                        className="w-full bg-[#0e0e0e] border border-[#232323] pl-8 pr-3 py-1.5 text-xs font-mono text-white outline-none focus:border-white rounded-lg"
+                        className="w-full bg-card border border-border pl-8 pr-3 py-1.5 text-xs font-mono text-foreground outline-none focus:border-theme-500 rounded-lg"
                       />
                     </div>
                   </div>
 
-                  {/* Grid of Version Tags (Image 3) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 max-h-[380px] overflow-y-auto pr-1">
+                  {/* Grid of Version Tags */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                     {SOFTWARE_BUILDS_MAP.filter(b => b.version.toLowerCase().includes(versionSearch.toLowerCase())).map((item, idx) => {
                       const isSelected = state.version === item.version;
                       const isTop = idx === 0;
@@ -864,20 +871,20 @@ export default function CreateServer() {
                           onClick={() => updateState('version', item.version)}
                           className={`px-3.5 py-2.5 rounded-xl border font-mono text-left flex items-center gap-2 transition-all ${
                             isSelected
-                              ? 'bg-blue-950/80 border-blue-400 text-blue-200 shadow-md shadow-blue-500/30'
-                              : 'bg-[#0e0e0e] hover:bg-[#141414] border-[#232323] hover:border-blue-400/60 text-blue-400'
+                              ? 'bg-theme-500/20 border-theme-500 text-theme-300 shadow-md shadow-theme-500/20 ring-1 ring-theme-500'
+                              : 'bg-card hover:bg-muted border-border hover:border-theme-500/40 text-foreground'
                           }`}
                         >
                           {isSelected ? (
-                            <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
+                            <CheckCircle2 className="w-4 h-4 text-theme-400 shrink-0" />
                           ) : (
-                            <Tag className="w-4 h-4 text-blue-400 shrink-0" />
+                            <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
                           )}
                           <span className="text-xs sm:text-sm font-bold whitespace-nowrap">
                             {item.version} ({item.build})
                           </span>
                           {isTop && (
-                            <span className="ml-auto text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono uppercase font-bold">
+                            <span className="ml-auto text-[9px] bg-theme-500/20 text-theme-300 px-1.5 py-0.5 rounded font-mono uppercase font-bold">
                               New
                             </span>
                           )}
@@ -892,23 +899,23 @@ export default function CreateServer() {
               {currentStep === 3 && (
                 <div className="step-content">
                   <div className="flex items-center gap-3 mb-6">
-                    <span className="font-mono text-xs text-[#4c4c4c]">04</span>
-                    <h2 className="font-display font-bold tracking-wide text-sm uppercase">RESOURCE ALLOCATION</h2>
-                    <span className="flex-1 h-px bg-[#232323]"></span>
+                    <span className="font-mono text-xs text-theme-400 font-bold">04</span>
+                    <h2 className="font-display font-bold tracking-wide text-sm uppercase text-foreground">RESOURCE ALLOCATION</h2>
+                    <span className="flex-1 h-px bg-border"></span>
                   </div>
 
                   <div className="flex items-center justify-between gap-4 mb-4">
-                    <label className="flex items-center gap-2 text-sm text-[#8f8f8f]">
-                      <MemoryStickIcon className="w-4 h-4" /> RAM Allocation (Memory)
+                    <label className="flex items-center gap-2 text-sm text-foreground font-medium">
+                      <MemoryStickIcon className="w-4 h-4 text-theme-400" /> RAM Allocation (Memory)
                     </label>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono text-[#8f8f8f]">Custom RAM:</span>
+                      <span className="text-[11px] font-mono text-muted-foreground">Custom RAM:</span>
                       <div className="relative w-28">
                         <input
                           type="number"
                           min="0.5"
                           step="0.5"
-                          className="inp font-mono !py-1.5 !px-2.5 text-xs text-white bg-[#0e0e0e] border border-[#232323] focus:border-white"
+                          className="inp font-mono !py-1.5 !px-2.5 text-xs text-foreground bg-card border border-border focus:border-theme-500"
                           value={state.ram}
                           onChange={(e) => {
                             const valStr = e.target.value;
@@ -923,7 +930,7 @@ export default function CreateServer() {
                             }
                           }}
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#4c4c4c] text-[10px] font-mono pointer-events-none">GB</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px] font-mono pointer-events-none">GB</span>
                       </div>
                     </div>
                   </div>
@@ -937,18 +944,18 @@ export default function CreateServer() {
                         className={`sel-card p-4 text-left ${r.v === Number(state.ram) ? 'selected' : ''}`}
                       >
                         <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
-                        <div className="font-display font-bold text-2xl text-white">
-                          {r.v}<span className="text-sm text-[#8f8f8f] ml-1">GB</span>
+                        <div className="font-display font-bold text-2xl text-foreground">
+                          {r.v}<span className="text-sm text-muted-foreground ml-1">GB</span>
                         </div>
-                        <div className="text-[11px] text-[#8f8f8f] mt-1.5 leading-snug">{r.label}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{r.label}</div>
                       </button>
                     ))}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-8">
                     <div>
-                      <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                        <Cpu className="w-4 h-4" /> CPU Limit (%)
+                      <label className="flex items-center gap-2 text-sm text-foreground font-medium mb-2.5">
+                        <Cpu className="w-4 h-4 text-theme-400" /> CPU Limit (%)
                       </label>
                       <div className="flex gap-2.5">
                         <div className="relative flex-1">
@@ -962,17 +969,17 @@ export default function CreateServer() {
                               updateState('auto', false); 
                             }}
                           />
-                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#4c4c4c] font-mono text-sm">%</span>
+                          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-sm">%</span>
                         </div>
                         <button 
                           type="button" 
                           onClick={handleAutoToggle}
-                          className={`px-4 py-3 font-display font-bold text-sm tracking-widest transition-all flex items-center gap-2 whitespace-nowrap border ${state.auto ? 'bg-white text-black border-white' : 'bg-transparent text-[#8f8f8f] border-[#232323]'}`}
+                          className={`px-4 py-3 font-display font-bold text-sm tracking-widest transition-all flex items-center gap-2 whitespace-nowrap rounded-lg border ${state.auto ? 'bg-theme-600 text-white border-theme-600 shadow-md shadow-theme-500/20' : 'bg-muted text-muted-foreground border-border hover:text-foreground'}`}
                         >
                           {state.auto ? <><Zap className="w-4 h-4" /> AUTO</> : <><SlidersHorizontal className="w-4 h-4" /> MANUAL</>}
                         </button>
                       </div>
-                      <p className={`text-[11px] mt-2.5 font-mono flex items-center gap-1.5 ${state.auto ? 'text-[#8f8f8f]' : 'text-[#4c4c4c]'}`}>
+                      <p className={`text-[11px] mt-2.5 font-mono flex items-center gap-1.5 ${state.auto ? 'text-theme-400' : 'text-muted-foreground'}`}>
                         {state.auto 
                           ? <><Sparkles className="w-3.5 h-3.5" /> Auto-optimized for {state.ram || 0}GB</> 
                           : <><SlidersHorizontal className="w-3.5 h-3.5" /> Manual override active</>
@@ -981,8 +988,8 @@ export default function CreateServer() {
                     </div>
 
                     <div>
-                      <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                        <HardDrive className="w-4 h-4" /> Disk Limit (GB)
+                      <label className="flex items-center gap-2 text-sm text-foreground font-medium mb-2.5">
+                        <HardDrive className="w-4 h-4 text-theme-400" /> Disk Limit (GB)
                       </label>
                       <input 
                         type="number" min="1" 
@@ -990,7 +997,7 @@ export default function CreateServer() {
                         value={state.disk}
                         onChange={(e) => updateState('disk', e.target.value === '' ? '' : Number(e.target.value))}
                       />
-                      <p className="text-[11px] text-[#4c4c4c] mt-2.5 font-mono flex items-center gap-1.5">
+                      <p className="text-[11px] text-muted-foreground mt-2.5 font-mono flex items-center gap-1.5">
                         <Info className="w-3.5 h-3.5" /> Storage limit for worlds, logs and data.
                       </p>
                     </div>
@@ -1002,44 +1009,44 @@ export default function CreateServer() {
               {currentStep === 4 && (
                 <div className="step-content">
                   <div className="flex items-center gap-3 mb-6">
-                    <span className="font-mono text-xs text-[#4c4c4c]">05</span>
-                    <h2 className="font-display font-bold tracking-wide text-sm uppercase">PORT & NETWORK ACCESS</h2>
-                    <span className="flex-1 h-px bg-[#232323]"></span>
+                    <span className="font-mono text-xs text-theme-400 font-bold">05</span>
+                    <h2 className="font-display font-bold tracking-wide text-sm uppercase text-foreground">PORT & NETWORK ACCESS</h2>
+                    <span className="flex-1 h-px bg-border"></span>
                   </div>
 
-                  <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                    <Network className="w-4 h-4" /> Server Port
+                  <label className="flex items-center gap-2 text-sm text-foreground font-medium mb-2.5">
+                    <Network className="w-4 h-4 text-theme-400" /> Server Port
                   </label>
                   <div className="relative mb-4">
                     <input 
-                      type="number" className={`inp font-mono ${portStatus === 'used' || portStatus === 'invalid' ? '!border-red-500/50' : portStatus === 'available' ? '!border-green-500/50' : ''}`} placeholder="25565" 
+                      type="number" className={`inp font-mono ${portStatus === 'used' || portStatus === 'invalid' ? '!border-red-500/60 ring-2 ring-red-500/20' : portStatus === 'available' ? '!border-emerald-500/60 ring-2 ring-emerald-500/20' : ''}`} placeholder="25565" 
                       value={state.port || ''} onChange={e => updateState('port', e.target.value ? Number(e.target.value) : '')}
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] tracking-widest flex items-center">
-                      {portStatus === 'checking' && <span className="text-[#8f8f8f]">CHECKING...</span>}
-                      {portStatus === 'available' && <span className="text-green-500">AVAILABLE</span>}
-                      {portStatus === 'used' && <span className="text-red-500">IN USE</span>}
-                      {portStatus === 'invalid' && <span className="text-red-500">INVALID</span>}
-                      {portStatus === 'error' && <span className="text-red-500">ERROR</span>}
+                      {portStatus === 'checking' && <span className="text-muted-foreground">CHECKING...</span>}
+                      {portStatus === 'available' && <span className="text-emerald-400 font-bold">AVAILABLE</span>}
+                      {portStatus === 'used' && <span className="text-red-400 font-bold">IN USE</span>}
+                      {portStatus === 'invalid' && <span className="text-red-400 font-bold">INVALID</span>}
+                      {portStatus === 'error' && <span className="text-red-400 font-bold">ERROR</span>}
                     </div>
                   </div>
-                  <p className="text-[11px] text-[#4c4c4c] -mt-2 mb-6 font-mono">
+                  <p className="text-[11px] text-muted-foreground -mt-2 mb-6 font-mono">
                     {portStatus === 'used' ? "This port is already in use." : portStatus === 'invalid' ? "Port must be between 1 and 65535." : portStatus === 'error' ? "Could not verify this port. Try again." : "The main port the server will bind to."}
                   </p>
 
-                  <label className="flex items-center gap-2 text-sm text-[#8f8f8f] mb-2.5">
-                    <Globe className="w-4 h-4" /> IP Alias
+                  <label className="flex items-center gap-2 text-sm text-foreground font-medium mb-2.5">
+                    <Globe className="w-4 h-4 text-theme-400" /> IP Alias
                   </label>
                   <input 
                     type="text" className="inp font-mono" placeholder="play.myserver.com" 
                     value={state.ip} onChange={e => updateState('ip', e.target.value)}
                   />
-                  <p className="text-[11px] text-[#4c4c4c] mt-2 mb-6 font-mono">Optional domain hostname to display on dashboard.</p>
+                  <p className="text-[11px] text-muted-foreground mt-2 mb-6 font-mono">Optional domain hostname to display on dashboard.</p>
 
-                  <div className="mt-4 pt-4 border-t border-[#232323]">
+                  <div className="mt-4 pt-4 border-t border-border">
                     <div className="flex items-center justify-between mb-2.5">
-                      <label className="flex items-center gap-2 text-sm text-[#8f8f8f]">
-                        <Cpu className="w-4 h-4" /> Execution Runtime Engine
+                      <label className="flex items-center gap-2 text-sm text-foreground font-medium">
+                        <Cpu className="w-4 h-4 text-theme-400" /> Execution Runtime Engine
                       </label>
                       <span className="text-[10px] font-mono bg-theme-500/20 text-theme-400 border border-theme-500/30 px-2 py-0.5 rounded-full font-bold uppercase">
                         Auto-Configured
@@ -1055,11 +1062,11 @@ export default function CreateServer() {
                       >
                         <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
                         <div>
-                          <div className="font-display font-bold text-sm text-white flex items-center gap-2">
+                          <div className="font-display font-bold text-sm text-foreground flex items-center gap-2">
                             Docker Container
                             {state.runtimeType === 'docker' && <span className="text-[9px] bg-theme-500 text-white px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
                           </div>
-                          <div className="text-[11px] text-[#8f8f8f] mt-1">Isolated sandbox container with resource enforcement & port virtualization.</div>
+                          <div className="text-[11px] text-muted-foreground mt-1">Isolated sandbox container with resource enforcement & port virtualization.</div>
                         </div>
                       </button>
 
@@ -1071,11 +1078,11 @@ export default function CreateServer() {
                       >
                         <span className="tick"><Check className="w-3 h-3 stroke-[3]" /></span>
                         <div>
-                          <div className="font-display font-bold text-sm text-white flex items-center gap-2">
+                          <div className="font-display font-bold text-sm text-foreground flex items-center gap-2">
                             Local Process (Direct)
-                            {state.runtimeType === 'local' && <span className="text-[9px] bg-amber-500 text-black px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
+                            {state.runtimeType === 'local' && <span className="text-[9px] bg-amber-500 text-black font-bold px-1.5 py-0.2 rounded font-mono uppercase">Active</span>}
                           </div>
-                          <div className="text-[11px] text-[#8f8f8f] mt-1">Native OS execution with auto-installed OpenJDK JRE. Zero Docker dependency.</div>
+                          <div className="text-[11px] text-muted-foreground mt-1">Native OS execution with auto-installed OpenJDK JRE. Zero Docker dependency.</div>
                         </div>
                       </button>
                     </div>
@@ -1087,13 +1094,13 @@ export default function CreateServer() {
               {currentStep === 5 && (
                 <div className="step-content">
                   <div className="flex items-center gap-3 mb-6">
-                    <span className="font-mono text-xs text-[#4c4c4c]">06</span>
-                    <h2 className="font-display font-bold tracking-wide text-sm uppercase">SPECIFICATION REVIEW</h2>
-                    <span className="flex-1 h-px bg-[#232323]"></span>
+                    <span className="font-mono text-xs text-theme-400 font-bold">06</span>
+                    <h2 className="font-display font-bold tracking-wide text-sm uppercase text-foreground">SPECIFICATION REVIEW</h2>
+                    <span className="flex-1 h-px bg-border"></span>
                   </div>
                   
                   {!deployed && deployProgress === 0 && (
-                    <div className="font-mono text-[13px] divide-y divide-[#232323] border border-[#232323] bg-[#0e0e0e]">
+                    <div className="font-mono text-[13px] border border-border bg-card/60 rounded-xl overflow-hidden shadow-inner">
                       {renderReviewRow('INSTANCE', state.name || '—')}
                       {renderReviewRow('SOFTWARE', currentSelectedSoftware.name || state.software)}
                       {renderReviewRow('VERSION', state.version || '26.2')}
@@ -1107,27 +1114,27 @@ export default function CreateServer() {
                   )}
 
                   {deployProgress > 0 && !deployed && (
-                    <div className="mt-6 border border-[#232323] bg-[#0e0e0e] p-4">
+                    <div className="mt-6 border border-border bg-card p-5 rounded-xl shadow-lg">
                       <div className="flex justify-between items-center mb-2.5">
-                        <span className="text-sm font-mono text-[#8f8f8f] flex items-center gap-2">
-                          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="text-sm font-mono text-muted-foreground flex items-center gap-2">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-theme-500 animate-pulse"></span>
                           {deployStage || "Provisioning container..."}
                         </span>
-                        <span className="text-sm font-mono text-white">{Math.round(deployProgress)}%</span>
+                        <span className="text-sm font-mono text-foreground font-bold">{Math.round(deployProgress)}%</span>
                       </div>
-                      <div className="w-full bg-[#232323] h-1.5 overflow-hidden">
-                        <div className="h-full bg-white transition-all duration-300" style={{ width: `${deployProgress}%` }}></div>
+                      <div className="w-full bg-muted h-2 rounded-full overflow-hidden">
+                        <div className="h-full bg-theme-500 transition-all duration-300 rounded-full" style={{ width: `${deployProgress}%` }}></div>
                       </div>
                     </div>
                   )}
 
                   {deployed && (
-                    <div className="mt-6 border border-white bg-white/5 p-6 text-center">
-                      <div className="w-12 h-12 mx-auto mb-3 bg-white text-black flex items-center justify-center">
+                    <div className="mt-6 border border-theme-500/50 bg-theme-500/10 p-6 rounded-2xl text-center">
+                      <div className="w-12 h-12 mx-auto mb-3 bg-theme-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-theme-500/30">
                         <Check className="w-6 h-6 stroke-[3]" />
                       </div>
-                      <p className="font-display font-bold text-lg">Instance Deployed Successfully</p>
-                      <p className="text-[#8f8f8f] text-sm mt-1 font-mono">
+                      <p className="font-display font-bold text-lg text-foreground">Instance Deployed Successfully</p>
+                      <p className="text-muted-foreground text-sm mt-1 font-mono">
                         {state.name} → {state.ram}GB ({currentSelectedSoftware.name} {state.version})
                       </p>
                     </div>
@@ -1137,17 +1144,17 @@ export default function CreateServer() {
             </div>
 
             {/* NAV BUTTONS */}
-            <div className="flex items-center justify-between gap-3 mt-9 pt-7 border-t border-[#232323]">
+            <div className="flex items-center justify-between gap-3 mt-9 pt-7 border-t border-border">
               <button 
                 type="button" 
                 onClick={() => { if (currentStep > 0) showStep(currentStep - 1); }}
                 disabled={currentStep === 0 || deployed || deployProgress > 0}
-                className="btn-ghost px-5 py-3 text-sm font-medium flex items-center gap-2"
+                className="btn-ghost px-5 py-3 text-sm font-medium flex items-center gap-2 cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" /> BACK
               </button>
               
-              <span className="font-mono text-[11px] tracking-widest text-[#4c4c4c] hidden sm:block">
+              <span className="font-mono text-[11px] tracking-widest text-muted-foreground hidden sm:block">
                 STEP {currentStep + 1} / {STEPS.length}
               </span>
               
@@ -1155,7 +1162,7 @@ export default function CreateServer() {
                 type="button" 
                 onClick={handleNext}
                 disabled={deployed || deployProgress > 0}
-                className="btn-white px-7 py-3 text-sm font-display font-bold tracking-widest flex items-center gap-2"
+                className="btn-primary-action px-7 py-3 text-sm font-display font-bold tracking-widest flex items-center gap-2 cursor-pointer"
               >
                 <span>{currentStep === STEPS.length - 1 ? (deployed ? 'DEPLOYED' : 'LAUNCH') : 'NEXT'}</span>
                 {currentStep === STEPS.length - 1 ? <Rocket className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4 rotate-180" />}

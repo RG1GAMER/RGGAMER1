@@ -3,11 +3,283 @@ import path from "path";
 import fs from "fs-extra";
 import nbt from "prismarine-nbt";
 import { promisify } from "util";
+import zlib from "zlib";
 import * as archiverPkg from "archiver";
 import { extractArchive } from "../utils/extract.js";
 
 const archiver = (archiverPkg as any).default || archiverPkg;
 const parseNbt = promisify(nbt.parse);
+
+export async function createDefaultLevelDat(filePath: string, worldName: string = "world", seed: string = "") {
+  try {
+    const seedBigInt = seed && !isNaN(Number(seed)) ? BigInt(seed) : BigInt(Math.floor(Math.random() * 1000000000));
+    const randomSeedHigh = Number(seedBigInt >> 32n);
+    const randomSeedLow = Number(seedBigInt & 0xFFFFFFFFn);
+
+    const data = {
+      type: 'compound',
+      name: '',
+      value: {
+        Data: {
+          type: 'compound',
+          value: {
+            LevelName: { type: 'string', value: worldName },
+            generatorName: { type: 'string', value: 'default' },
+            generatorVersion: { type: 'int', value: 1 },
+            version: { type: 'int', value: 19133 },
+            DataVersion: { type: 'int', value: 3953 },
+            Version: {
+              type: 'compound',
+              value: {
+                Id: { type: 'int', value: 3953 },
+                Name: { type: 'string', value: '1.21.1' },
+                Series: { type: 'string', value: 'main' },
+                Snapshot: { type: 'byte', value: 0 }
+              }
+            },
+            Difficulty: { type: 'byte', value: 1 },
+            DifficultyLocked: { type: 'byte', value: 0 },
+            GameType: { type: 'int', value: 0 },
+            hardcore: { type: 'byte', value: 0 },
+            RandomSeed: { type: 'long', value: [randomSeedHigh, randomSeedLow] },
+            SpawnX: { type: 'int', value: 0 },
+            SpawnY: { type: 'int', value: 64 },
+            SpawnZ: { type: 'int', value: 0 },
+            Time: { type: 'long', value: [0, 0] },
+            DayTime: { type: 'long', value: [0, 0] },
+            initialized: { type: 'byte', value: 1 },
+            allowCommands: { type: 'byte', value: 1 },
+            WorldGenSettings: {
+              type: 'compound',
+              value: {
+                seed: { type: 'long', value: [randomSeedHigh, randomSeedLow] },
+                generate_features: { type: 'byte', value: 1 },
+                bonus_chest: { type: 'byte', value: 0 }
+              }
+            }
+          }
+        }
+      }
+    };
+    const uncompressed = nbt.writeUncompressed(data as any);
+    const compressed = zlib.gzipSync(Buffer.from(uncompressed));
+    await fs.writeFile(filePath, compressed);
+  } catch (err) {
+    console.warn("createDefaultLevelDat error:", err);
+  }
+}
+
+export async function createDefaultRegionFile(filePath: string) {
+  if (!fs.existsSync(filePath)) {
+    const emptyMcaHeader = Buffer.alloc(8192, 0);
+    await fs.writeFile(filePath, emptyMcaHeader);
+  }
+}
+
+export async function ensureDefaultWorldStructure(serverDir: string, levelName: string = "world", seed: string = "") {
+  try {
+    const worldDir = path.join(serverDir, levelName);
+    await fs.ensureDir(worldDir);
+    await fs.ensureDir(path.join(worldDir, "region"));
+    await fs.ensureDir(path.join(worldDir, "data"));
+    await fs.ensureDir(path.join(worldDir, "entities"));
+    await fs.ensureDir(path.join(worldDir, "poi"));
+    await fs.ensureDir(path.join(worldDir, "datapacks"));
+    await fs.ensureDir(path.join(worldDir, "DIM-1", "region"));
+    await fs.ensureDir(path.join(worldDir, "DIM1", "region"));
+
+    const levelDatPath = path.join(worldDir, "level.dat");
+    if (!fs.existsSync(levelDatPath)) {
+      await createDefaultLevelDat(levelDatPath, levelName, seed);
+    }
+
+    await createDefaultRegionFile(path.join(worldDir, "region", "r.0.0.mca"));
+    await createDefaultRegionFile(path.join(worldDir, "DIM-1", "region", "r.0.0.mca"));
+    await createDefaultRegionFile(path.join(worldDir, "DIM1", "region", "r.0.0.mca"));
+
+    // Companion dimensions for Paper/Purpur/Spigot/Bukkit
+    const netherDir = path.join(serverDir, `${levelName}_nether`);
+    const endDir = path.join(serverDir, `${levelName}_the_end`);
+    await fs.ensureDir(netherDir);
+    await fs.ensureDir(path.join(netherDir, "region"));
+    await fs.ensureDir(path.join(netherDir, "data"));
+    await fs.ensureDir(endDir);
+    await fs.ensureDir(path.join(endDir, "region"));
+    await fs.ensureDir(path.join(endDir, "data"));
+
+    await createDefaultRegionFile(path.join(netherDir, "region", "r.0.0.mca"));
+    await createDefaultRegionFile(path.join(endDir, "region", "r.0.0.mca"));
+  } catch (err) {
+    console.warn("ensureDefaultWorldStructure error:", err);
+  }
+}
+
+export async function ensureAternosStandardServerFiles(serverDir: string, serverData: any = {}) {
+  try {
+    await fs.ensureDir(serverDir);
+
+    // 1. eula.txt
+    const eulaPath = path.join(serverDir, "eula.txt");
+    if (!fs.existsSync(eulaPath)) {
+      await fs.writeFile(eulaPath, "eula=true\n", "utf-8");
+    }
+
+    // 2. server.properties
+    const propsPath = path.join(serverDir, "server.properties");
+    if (!fs.existsSync(propsPath)) {
+      const defaultProps = [
+        `# Minecraft Server Properties - Initialized by Panel`,
+        `server-port=${serverData.port || 25565}`,
+        `server-ip=0.0.0.0`,
+        `motd=${serverData.name || "A Minecraft Server"}`,
+        `level-name=${serverData.levelName || "world"}`,
+        `gamemode=survival`,
+        `difficulty=easy`,
+        `pvp=true`,
+        `max-players=20`,
+        `online-mode=false`,
+        `allow-flight=true`,
+        `enable-command-block=true`,
+        `spawn-protection=0`,
+        `view-distance=10`,
+        `simulation-distance=10`,
+        `enable-query=true`,
+        `query.port=${serverData.port || 25565}`,
+        `enable-rcon=false`,
+        ``
+      ].join("\n");
+      await fs.writeFile(propsPath, defaultProps, "utf-8");
+    }
+
+    // 3. banned-ips.json
+    const bannedIpsPath = path.join(serverDir, "banned-ips.json");
+    if (!fs.existsSync(bannedIpsPath)) {
+      await fs.writeFile(bannedIpsPath, "[]\n", "utf-8");
+    }
+
+    // 4. banned-players.json
+    const bannedPlayersPath = path.join(serverDir, "banned-players.json");
+    if (!fs.existsSync(bannedPlayersPath)) {
+      await fs.writeFile(bannedPlayersPath, "[]\n", "utf-8");
+    }
+
+    // 5. ops.json
+    const opsPath = path.join(serverDir, "ops.json");
+    if (!fs.existsSync(opsPath)) {
+      await fs.writeFile(opsPath, "[]\n", "utf-8");
+    }
+
+    // 6. whitelist.json
+    const whitelistPath = path.join(serverDir, "whitelist.json");
+    if (!fs.existsSync(whitelistPath)) {
+      await fs.writeFile(whitelistPath, "[]\n", "utf-8");
+    }
+
+    // 7. bukkit.yml
+    const bukkitPath = path.join(serverDir, "bukkit.yml");
+    if (!fs.existsSync(bukkitPath)) {
+      const defaultBukkit = [
+        `# Bukkit configuration generated by Panel`,
+        `settings:`,
+        `  allow-end: true`,
+        `  warn-on-overload: true`,
+        `  permissions-file: permissions.yml`,
+        `  update-folder: update`,
+        `  plugin-profiling: false`,
+        `  connection-throttle: 4000`,
+        `  query-plugins: true`,
+        `  deprecated-verbose: default`,
+        `  shutdown-message: Server closed`,
+        `spawn-limits:`,
+        `  monsters: 70`,
+        `  animals: 10`,
+        `  water-animals: 5`,
+        `  water-ambient: 20`,
+        `  ambient: 15`,
+        `chunk-gc:`,
+        `  period-in-ticks: 600`,
+        `ticks-per:`,
+        `  animal-spawns: 400`,
+        `  monster-spawns: 1`,
+        `  autosave: 6000`,
+        `aliases: now-in-commands.yml`,
+        ``
+      ].join("\n");
+      await fs.writeFile(bukkitPath, defaultBukkit, "utf-8");
+    }
+
+    // 8. commands.yml
+    const commandsPath = path.join(serverDir, "commands.yml");
+    if (!fs.existsSync(commandsPath)) {
+      const defaultCommands = [
+        `# Command-block & alias configuration`,
+        `command-block-overrides: []`,
+        `ignore-vanilla-permissions: false`,
+        `aliases:`,
+        `  icanhasbukkit:`,
+        `  - version $1-`,
+        ``
+      ].join("\n");
+      await fs.writeFile(commandsPath, defaultCommands, "utf-8");
+    }
+
+    // 9. help.yml
+    const helpPath = path.join(serverDir, "help.yml");
+    if (!fs.existsSync(helpPath)) {
+      const defaultHelp = [
+        `# Help topic configuration`,
+        `general:`,
+        `  topic: Help`,
+        `  shortText: Shows this help menu`,
+        ``
+      ].join("\n");
+      await fs.writeFile(helpPath, defaultHelp, "utf-8");
+    }
+
+    // 10. spigot.yml
+    const spigotPath = path.join(serverDir, "spigot.yml");
+    if (!fs.existsSync(spigotPath)) {
+      const defaultSpigot = [
+        `# Spigot configuration generated by Panel`,
+        `config-version: 12`,
+        `settings:`,
+        `  debug: false`,
+        `  bungeecord: false`,
+        `  timeout-time: 60`,
+        `  restart-on-crash: true`,
+        `  restart-script: ./start.sh`,
+        `  sample-count: 12`,
+        `messages:`,
+        `  whitelist: You are not whitelisted on this server!`,
+        `  unknown-command: Unknown command. Type "/help" for help.`,
+        `  server-full: The server is full!`,
+        `  outdated-client: Outdated client! Please use {0}`,
+        `  outdated-server: Outdated server! I'm still on {0}`,
+        `  restart: Server is restarting`,
+        `world-settings:`,
+        `  default:`,
+        `    verbose: false`,
+        `    view-distance: default`,
+        `    simulation-distance: default`,
+        `    enable-zombie-pigmen-portal-spawns: true`,
+        ``
+      ].join("\n");
+      await fs.writeFile(spigotPath, defaultSpigot, "utf-8");
+    }
+
+    // 11. Directories: config, plugins, mods, resourcepacks
+    await fs.ensureDir(path.join(serverDir, "config"));
+    await fs.ensureDir(path.join(serverDir, "plugins"));
+    await fs.ensureDir(path.join(serverDir, "mods"));
+    await fs.ensureDir(path.join(serverDir, "resourcepacks"));
+
+    // 12. World folder and dimensions
+    const levelName = await getLevelName(serverDir) || serverData.levelName || "world";
+    await ensureDefaultWorldStructure(serverDir, levelName, serverData.seed || "");
+  } catch (err) {
+    console.warn("ensureAternosStandardServerFiles warning:", err);
+  }
+}
 
 async function getLevelName(serverDir: string) {
   const propsPath = path.join(serverDir, "server.properties");
@@ -279,20 +551,6 @@ export const listWorlds = async (req: Request, res: Response) => {
     const primaryWorld = await inspectWorld(levelName, "overworld");
     if (primaryWorld) {
       worldList.push(primaryWorld);
-    } else {
-      worldList.push({
-        name: levelName,
-        displayName: levelName,
-        isPrimary: true,
-        dimension: "overworld",
-        sizeMB: 0,
-        chunkCount: 0,
-        hasLevelDat: false,
-        worldVersion: "Not Generated",
-        dataVersion: 0,
-        optimized: false,
-        hasDatapacks: false
-      });
     }
 
     // 2. Discover companion dimensions (e.g. world_nether, world_the_end or survival_nether, survival_the_end)
@@ -319,96 +577,99 @@ export const listWorlds = async (req: Request, res: Response) => {
     const hasNetherInList = worldList.some(w => w.dimension === "nether");
     const hasEndInList = worldList.some(w => w.dimension === "the_end");
 
-    if (!hasNetherInList && fs.existsSync(path.join(primaryDir, "DIM-1"))) {
-      const dim1Dir = path.join(primaryDir, "DIM-1");
-      let dim1Size = 0;
-      let dim1Chunks = 0;
-      try {
-        const regDir = path.join(dim1Dir, "region");
-        if (fs.existsSync(regDir)) {
-          const rFiles = await fs.readdir(regDir);
-          dim1Chunks = rFiles.filter(f => f.endsWith(".mca") || f.endsWith(".mcr")).length;
-        }
-        const calcSize = async (d: string): Promise<number> => {
-          let tot = 0;
-          try {
-            const files = await fs.readdir(d, { withFileTypes: true });
-            for (const f of files) {
-              const fp = path.join(d, f.name);
-              if (f.isDirectory()) tot += await calcSize(fp);
-              else {
-                const st = await fs.stat(fp);
-                tot += st.size;
+    if (fs.existsSync(primaryDir)) {
+      if (!hasNetherInList && fs.existsSync(path.join(primaryDir, "DIM-1"))) {
+        const dim1Dir = path.join(primaryDir, "DIM-1");
+        let dim1Size = 0;
+        let dim1Chunks = 0;
+        try {
+          const regDir = path.join(dim1Dir, "region");
+          if (fs.existsSync(regDir)) {
+            const rFiles = await fs.readdir(regDir);
+            dim1Chunks = rFiles.filter(f => f.endsWith(".mca") || f.endsWith(".mcr")).length;
+          }
+          const calcSize = async (d: string): Promise<number> => {
+            let tot = 0;
+            try {
+              const files = await fs.readdir(d, { withFileTypes: true });
+              for (const f of files) {
+                const fp = path.join(d, f.name);
+                if (f.isDirectory()) tot += await calcSize(fp);
+                else {
+                  const st = await fs.stat(fp);
+                  tot += st.size;
+                }
               }
-            }
-          } catch {}
-          return tot;
-        };
-        dim1Size = await calcSize(dim1Dir);
-      } catch {}
+            } catch {}
+            return tot;
+          };
+          dim1Size = await calcSize(dim1Dir);
+        } catch {}
 
-      worldList.push({
-        name: `${levelName}/DIM-1`,
-        displayName: `${levelName} Nether`,
-        isPrimary: false,
-        dimension: "nether",
-        sizeMB: Number((dim1Size / (1024 * 1024)).toFixed(2)),
-        chunkCount: dim1Chunks,
-        hasLevelDat: false,
-        worldVersion: primaryWorld?.worldVersion || "Vanilla",
-        dataVersion: primaryWorld?.dataVersion || 0,
-        optimized: fs.existsSync(path.join(dim1Dir, ".optimized")),
-        hasDatapacks: false
-      });
-    }
+        worldList.push({
+          name: `${levelName}/DIM-1`,
+          displayName: `${levelName} Nether`,
+          isPrimary: false,
+          dimension: "nether",
+          sizeMB: Number((dim1Size / (1024 * 1024)).toFixed(2)),
+          chunkCount: dim1Chunks,
+          hasLevelDat: false,
+          worldVersion: primaryWorld?.worldVersion || "Vanilla",
+          dataVersion: primaryWorld?.dataVersion || 0,
+          optimized: fs.existsSync(path.join(dim1Dir, ".optimized")),
+          hasDatapacks: false
+        });
+      }
 
-    if (!hasEndInList && fs.existsSync(path.join(primaryDir, "DIM1"))) {
-      const dimEndDir = path.join(primaryDir, "DIM1");
-      let dimEndSize = 0;
-      let dimEndChunks = 0;
-      try {
-        const regDir = path.join(dimEndDir, "region");
-        if (fs.existsSync(regDir)) {
-          const rFiles = await fs.readdir(regDir);
-          dimEndChunks = rFiles.filter(f => f.endsWith(".mca") || f.endsWith(".mcr")).length;
-        }
-        const calcSize = async (d: string): Promise<number> => {
-          let tot = 0;
-          try {
-            const files = await fs.readdir(d, { withFileTypes: true });
-            for (const f of files) {
-              const fp = path.join(d, f.name);
-              if (f.isDirectory()) tot += await calcSize(fp);
-              else {
-                const st = await fs.stat(fp);
-                tot += st.size;
+      if (!hasEndInList && fs.existsSync(path.join(primaryDir, "DIM1"))) {
+        const dimEndDir = path.join(primaryDir, "DIM1");
+        let dimEndSize = 0;
+        let dimEndChunks = 0;
+        try {
+          const regDir = path.join(dimEndDir, "region");
+          if (fs.existsSync(regDir)) {
+            const rFiles = await fs.readdir(regDir);
+            dimEndChunks = rFiles.filter(f => f.endsWith(".mca") || f.endsWith(".mcr")).length;
+          }
+          const calcSize = async (d: string): Promise<number> => {
+            let tot = 0;
+            try {
+              const files = await fs.readdir(d, { withFileTypes: true });
+              for (const f of files) {
+                const fp = path.join(d, f.name);
+                if (f.isDirectory()) tot += await calcSize(fp);
+                else {
+                  const st = await fs.stat(fp);
+                  tot += st.size;
+                }
               }
-            }
-          } catch {}
-          return tot;
-        };
-        dimEndSize = await calcSize(dimEndDir);
-      } catch {}
+            } catch {}
+            return tot;
+          };
+          dimEndSize = await calcSize(dimEndDir);
+        } catch {}
 
-      worldList.push({
-        name: `${levelName}/DIM1`,
-        displayName: `${levelName} The End`,
-        isPrimary: false,
-        dimension: "the_end",
-        sizeMB: Number((dimEndSize / (1024 * 1024)).toFixed(2)),
-        chunkCount: dimEndChunks,
-        hasLevelDat: false,
-        worldVersion: primaryWorld?.worldVersion || "Vanilla",
-        dataVersion: primaryWorld?.dataVersion || 0,
-        optimized: fs.existsSync(path.join(dimEndDir, ".optimized")),
-        hasDatapacks: false
-      });
+        worldList.push({
+          name: `${levelName}/DIM1`,
+          displayName: `${levelName} The End`,
+          isPrimary: false,
+          dimension: "the_end",
+          sizeMB: Number((dimEndSize / (1024 * 1024)).toFixed(2)),
+          chunkCount: dimEndChunks,
+          hasLevelDat: false,
+          worldVersion: primaryWorld?.worldVersion || "Vanilla",
+          dataVersion: primaryWorld?.dataVersion || 0,
+          optimized: fs.existsSync(path.join(dimEndDir, ".optimized")),
+          hasDatapacks: false
+        });
+      }
     }
 
     // Return structured response with both list and activeWorld
     res.json({
       worlds: worldList,
-      activeWorld: levelName
+      activeWorld: levelName,
+      isGenerated: worldList.length > 0
     });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -608,9 +869,12 @@ export const generateWorld = async (req: Request, res: Response) => {
 
     await fs.writeFile(propsPath, props, "utf-8");
 
+    // Immediately create world folder and default dimension structures
+    await ensureDefaultWorldStructure(serverDir, cleanWorldName, seed);
+
     res.json({
       success: true,
-      message: `New world '${cleanWorldName}' configured with seed '${seed || "Random"}' and type '${worldType}'. It will generate automatically on next server start.`,
+      message: `New world '${cleanWorldName}' generated with seed '${seed || "Random"}' and type '${worldType}'.`,
       worldName: cleanWorldName
     });
   } catch (e: any) {

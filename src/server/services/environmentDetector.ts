@@ -375,3 +375,462 @@ export async function detectEnvironment(forceRefresh = false): Promise<Environme
   lastCheckTime = now;
   return envInfo;
 }
+
+/**
+ * Detects the specific VPS or Cloud Hosting Provider
+ */
+async function detectVPSProvider(): Promise<{
+  providerName: string;
+  providerType: "vps" | "cloud_vm" | "cloud_container" | "dedicated" | "local_pc" | "codespaces";
+  details: string;
+  hypervisor: string;
+}> {
+  // 1. Google Cloud Platform / Cloud Run / GCE
+  if (process.env.K_SERVICE || process.env.CLOUD_RUN_JOB || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT) {
+    return {
+      providerName: "Google Cloud (Cloud Run / GCE)",
+      providerType: "cloud_container",
+      details: "Google Cloud Platform managed container infrastructure with auto-scaling compute.",
+      hypervisor: "Google gVisor / OCI Sandbox"
+    };
+  }
+
+  // 2. GitHub Codespaces / Actions
+  if (process.env.CODESPACES === "true" || process.env.GITHUB_CODESPACE === "true") {
+    return {
+      providerName: "GitHub Codespaces (Microsoft Azure)",
+      providerType: "codespaces",
+      details: "GitHub Cloud Development VM containerized on Azure infrastructure.",
+      hypervisor: "Docker / Azure Container"
+    };
+  }
+
+  // 3. AWS EC2 / Lightsail / ECS
+  if (process.env.AWS_EXECUTION_ENV || process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION) {
+    return {
+      providerName: "Amazon Web Services (AWS EC2 / Lightsail)",
+      providerType: "cloud_vm",
+      details: "AWS Elastic Compute Cloud (EC2 / Lightsail) virtual private server instance.",
+      hypervisor: "AWS Nitro / Xen Hypervisor"
+    };
+  }
+
+  // 4. DigitalOcean
+  if (process.env.DIGITALOCEAN_ORIGIN || (process.env.USER && process.env.USER.includes("do-user"))) {
+    return {
+      providerName: "DigitalOcean Droplet",
+      providerType: "vps",
+      details: "DigitalOcean cloud VPS instance with high-speed SSD storage.",
+      hypervisor: "KVM Virtualization"
+    };
+  }
+
+  // 5. CodeSandbox / Web Sandbox
+  if (
+    process.env.CODESANDBOX_SSE === "true" ||
+    process.env.CSB === "true" ||
+    process.env.SANDBOX_URL ||
+    process.env.SANDBOX_ID ||
+    process.env.WEB_CONTAINER === "true"
+  ) {
+    return {
+      providerName: "Cloud Web Sandbox / Container",
+      providerType: "cloud_container",
+      details: "Isolated cloud development sandbox container.",
+      hypervisor: "MicroVM / OCI Container"
+    };
+  }
+
+  // Check hardware DMI & system vendors if Linux
+  if (process.platform === "linux") {
+    try {
+      let sysVendor = "";
+      let productName = "";
+      let biosVendor = "";
+
+      if (await fs.pathExists("/sys/class/dmi/id/sys_vendor")) {
+        sysVendor = (await fs.readFile("/sys/class/dmi/id/sys_vendor", "utf8")).trim().toLowerCase();
+      }
+      if (await fs.pathExists("/sys/class/dmi/id/product_name")) {
+        productName = (await fs.readFile("/sys/class/dmi/id/product_name", "utf8")).trim().toLowerCase();
+      }
+      if (await fs.pathExists("/sys/class/dmi/id/bios_vendor")) {
+        biosVendor = (await fs.readFile("/sys/class/dmi/id/bios_vendor", "utf8")).trim().toLowerCase();
+      }
+
+      // Check systemd-detect-virt if available
+      let virtOut = "";
+      try {
+        const { stdout } = await execAsync("systemd-detect-virt 2>/dev/null || true", { timeout: 1500 });
+        virtOut = stdout.trim().toLowerCase();
+      } catch {}
+
+      // Hetzner
+      if (sysVendor.includes("hetzner") || productName.includes("hetzner") || biosVendor.includes("hetzner")) {
+        return {
+          providerName: "Hetzner Cloud VPS",
+          providerType: "vps",
+          details: "Hetzner Cloud high-performance NVMe virtual private server.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // Contabo
+      if (sysVendor.includes("contabo") || productName.includes("contabo") || biosVendor.includes("contabo")) {
+        return {
+          providerName: "Contabo VPS",
+          providerType: "vps",
+          details: "Contabo Cloud VPS with dedicated storage and multi-core CPU.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // OVHcloud / SoYouStart / Kimsufi
+      if (sysVendor.includes("ovh") || productName.includes("ovh") || biosVendor.includes("ovh")) {
+        return {
+          providerName: "OVHcloud VPS / Dedicated",
+          providerType: "vps",
+          details: "OVHcloud anti-DDoS protected virtual or dedicated server.",
+          hypervisor: virtOut || "KVM / OpenStack"
+        };
+      }
+
+      // Oracle Cloud Infrastructure (OCI)
+      if (sysVendor.includes("oracle") || productName.includes("oraclecloud") || biosVendor.includes("oracle")) {
+        return {
+          providerName: "Oracle Cloud (OCI) Compute Instance",
+          providerType: "cloud_vm",
+          details: "Oracle Cloud Infrastructure compute instance.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // Microsoft Azure
+      if (sysVendor.includes("microsoft") || productName.includes("virtual machine") || biosVendor.includes("microsoft")) {
+        return {
+          providerName: "Microsoft Azure Virtual Machine",
+          providerType: "cloud_vm",
+          details: "Microsoft Azure enterprise cloud virtual machine.",
+          hypervisor: virtOut || "Hyper-V / Azure Hypervisor"
+        };
+      }
+
+      // Google Compute Engine (GCE)
+      if (sysVendor.includes("google") || productName.includes("google compute engine")) {
+        return {
+          providerName: "Google Compute Engine (GCP VPS)",
+          providerType: "vps",
+          details: "Google Cloud Platform Compute Engine Virtual Private Server.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // Linode / Akamai
+      if (sysVendor.includes("linode") || productName.includes("linode")) {
+        return {
+          providerName: "Linode / Akamai Cloud VPS",
+          providerType: "vps",
+          details: "Linode high-speed cloud compute instance.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // Vultr
+      if (sysVendor.includes("vultr") || productName.includes("vultr")) {
+        return {
+          providerName: "Vultr Cloud Compute",
+          providerType: "vps",
+          details: "Vultr SSD / NVMe cloud virtual server.",
+          hypervisor: virtOut || "KVM"
+        };
+      }
+
+      // KVM / QEMU Generic VPS
+      if (sysVendor.includes("qemu") || productName.includes("kvm") || virtOut === "kvm" || virtOut === "qemu") {
+        return {
+          providerName: "Linux KVM / QEMU Virtual Private Server (VPS)",
+          providerType: "vps",
+          details: "Hardware-accelerated KVM virtual private server with dedicated resources.",
+          hypervisor: "KVM (Kernel-based Virtual Machine)"
+        };
+      }
+
+      // VMware / ESXi
+      if (sysVendor.includes("vmware") || virtOut === "vmware") {
+        return {
+          providerName: "VMware vSphere / ESXi Virtual Server",
+          providerType: "vps",
+          details: "Enterprise VMware hypervisor virtual machine.",
+          hypervisor: "VMware ESXi Hypervisor"
+        };
+      }
+
+      // Docker / LXC Container
+      if (virtOut === "docker" || virtOut === "lxc" || (await fs.pathExists("/.dockerenv"))) {
+        return {
+          providerName: "Docker / LXC Container Instance",
+          providerType: "cloud_container",
+          details: "Containerized Linux guest environment with shared kernel isolation.",
+          hypervisor: virtOut === "lxc" ? "LXC Container" : "Docker / OCI Engine"
+        };
+      }
+
+      // Bare Metal / Physical Server
+      if (virtOut === "none" || (!virtOut && !sysVendor.includes("virtual"))) {
+        return {
+          providerName: "Bare Metal Dedicated Linux Server",
+          providerType: "dedicated",
+          details: "Physical bare-metal server with direct hardware access (no hypervisor overhead).",
+          hypervisor: "None (Physical Bare Metal)"
+        };
+      }
+    } catch {}
+  }
+
+  // Windows / Mac or fallback
+  if (process.platform === "win32") {
+    return {
+      providerName: "Windows Server / Desktop Host",
+      providerType: "local_pc",
+      details: "Microsoft Windows operating system host environment.",
+      hypervisor: "Native OS / Hyper-V"
+    };
+  }
+
+  if (process.platform === "darwin") {
+    return {
+      providerName: "Apple macOS Host System",
+      providerType: "local_pc",
+      details: "Apple Darwin Unix operating system workstation.",
+      hypervisor: "Native Apple Silicon / Darwin"
+    };
+  }
+
+  return {
+    providerName: "Standard Linux Virtual Private Server (VPS)",
+    providerType: "vps",
+    details: "Linux virtual server host running Node.js runtime.",
+    hypervisor: "Linux Virtualization"
+  };
+}
+
+/**
+ * Detects the Console & Terminal subsystem
+ */
+async function detectConsoleSystem(): Promise<{
+  consoleType: string;
+  shell: string;
+  terminalStatus: "detected" | "warning";
+  details: string;
+  features: string[];
+}> {
+  const shell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "/bin/bash");
+  const isTTY = Boolean(process.stdout.isTTY || process.stdin.isTTY);
+  
+  // Check if bash/sh is available
+  let bashVersion = "Standard Shell";
+  try {
+    const { stdout } = await execAsync("bash --version 2>/dev/null || sh --version 2>/dev/null || true", { timeout: 1500 });
+    const match = stdout.match(/GNU bash, version\s+([0-9.]+)/i);
+    if (match) {
+      bashVersion = `GNU Bash v${match[1]}`;
+    }
+  } catch {}
+
+  const features: string[] = [
+    "WebSocket Stream Bridge",
+    "ANSI Color Rendering",
+    "Real-time Stdout / Stderr Interceptor",
+    "Interactive Command Dispatcher"
+  ];
+
+  if (process.env.PM2_HOME || process.env.pm_id) {
+    features.push("PM2 Process Supervisor");
+  }
+
+  return {
+    consoleType: "Interactive Linux Web Terminal & Process Stream",
+    shell: `${shell} (${bashVersion})`,
+    terminalStatus: "detected",
+    details: `Interactive virtual console attached. Supports live log streaming, ANSI escape codes, and stdin command transmission.`,
+    features
+  };
+}
+
+export interface DetectionItem {
+  id: string;
+  name: string;
+  category: "vps" | "console" | "hardware" | "virtualization" | "network";
+  status: "detected" | "missing" | "warning";
+  value?: string;
+  details: string;
+  required: boolean;
+  actionHint?: string;
+}
+
+export interface DeepDetectionReport {
+  timestamp: string;
+  overallStatus: "success" | "warning" | "error";
+  summary: {
+    totalChecks: number;
+    detectedCount: number;
+    missingCount: number;
+    warningCount: number;
+  };
+  headline: string;
+  speechText: string;
+  vps: {
+    providerName: string;
+    providerType: string;
+    hypervisor: string;
+    details: string;
+  };
+  console: {
+    consoleType: string;
+    shell: string;
+    details: string;
+    features: string[];
+  };
+  items: DetectionItem[];
+  environment: EnvironmentInfo;
+}
+
+/**
+ * Performs auto-detection focused strictly on VPS Type, Console, Virtualization, and Hardware Architecture.
+ */
+export async function performDeepAutoDetection(): Promise<DeepDetectionReport> {
+  const envInfo = await detectEnvironment(true);
+  const vpsInfo = await detectVPSProvider();
+  const consoleInfo = await detectConsoleSystem();
+  const items: DetectionItem[] = [];
+
+  // 1. VPS / Cloud Provider Detection
+  items.push({
+    id: "vps_provider",
+    name: "VPS & Cloud Hosting Provider",
+    category: "vps",
+    status: "detected",
+    value: vpsInfo.providerName,
+    details: `${vpsInfo.details} (Host: ${envInfo.hostname})`,
+    required: true
+  });
+
+  // 2. Virtualization & Hypervisor Engine
+  items.push({
+    id: "virtualization_type",
+    name: "Virtualization & Hypervisor",
+    category: "virtualization",
+    status: "detected",
+    value: vpsInfo.hypervisor,
+    details: `Compute Virtualization: ${vpsInfo.hypervisor} • Host Platform: ${envInfo.platform} (${envInfo.arch})`,
+    required: true
+  });
+
+  // 3. Server Console & Terminal Subsystem
+  items.push({
+    id: "console_subsystem",
+    name: "Server Console & Terminal Engine",
+    category: "console",
+    status: "detected",
+    value: consoleInfo.consoleType,
+    details: `${consoleInfo.details} • Active Shell: ${consoleInfo.shell}`,
+    required: true
+  });
+
+  // 4. Operating System & Linux Kernel
+  let kernelVersion = "";
+  try {
+    const { stdout } = await execAsync("uname -r 2>/dev/null || true", { timeout: 1500 });
+    kernelVersion = stdout.trim();
+  } catch {}
+
+  items.push({
+    id: "os_kernel",
+    name: "Operating System & Kernel",
+    category: "vps",
+    status: "detected",
+    value: `${envInfo.distro} (${envInfo.arch})`,
+    details: `Distribution: ${envInfo.distro}${kernelVersion ? ` • Kernel: ${kernelVersion}` : ""} • Architecture: ${envInfo.arch}`,
+    required: true
+  });
+
+  // 5. VPS Hardware: CPU Cores & Model
+  items.push({
+    id: "vps_cpu",
+    name: "VPS CPU & Processing Cores",
+    category: "hardware",
+    status: "detected",
+    value: `${envInfo.hardware.cpuCores} vCPU / Core(s) (${envInfo.hardware.cpuModel})`,
+    details: `Assigned Processing Units: ${envInfo.hardware.cpuCores} core(s) • Model: ${envInfo.hardware.cpuModel}`,
+    required: true
+  });
+
+  // 6. VPS Hardware: RAM & Memory Allocation
+  items.push({
+    id: "vps_ram",
+    name: "VPS RAM & Memory Allocation",
+    category: "hardware",
+    status: "detected",
+    value: `${envInfo.hardware.totalMemoryGB} GB Total (${envInfo.hardware.freeMemoryGB} GB Free Available)`,
+    details: `Total Physical / Virtual RAM: ${envInfo.hardware.totalMemoryGB} GB • Free Memory: ${envInfo.hardware.freeMemoryGB} GB`,
+    required: true
+  });
+
+  // 7. Public & Local Network Addressing
+  items.push({
+    id: "network_ip",
+    name: "Public WAN IP & Local Network Gateway",
+    category: "network",
+    status: "detected",
+    value: envInfo.capabilities.publicIp ? `Public IP: ${envInfo.capabilities.publicIp}` : `Local IP: ${envInfo.capabilities.localIp || "127.0.0.1"}`,
+    details: `Public WAN IP: ${envInfo.capabilities.publicIp || "Cloud NAT / Internal"} • Local Gateway IP: ${envInfo.capabilities.localIp || "127.0.0.1"}`,
+    required: true
+  });
+
+  // 8. Process Supervisor & Daemon Runtime
+  const supervisorName = process.env.PM2_HOME || process.env.pm_id ? "PM2 Process Manager" : "Node.js System Service Daemon";
+  items.push({
+    id: "process_supervisor",
+    name: "Console Process Supervisor & Uptime",
+    category: "console",
+    status: "detected",
+    value: `${supervisorName} (Uptime: ${Math.floor(envInfo.uptime / 60)} min)`,
+    details: `Process supervisory layer running. Features: ${consoleInfo.features.join(", ")}`,
+    required: true
+  });
+
+  // Summary counts
+  const detectedCount = items.filter((i) => i.status === "detected").length;
+  const missingCount = items.filter((i) => i.status === "missing").length;
+  const warningCount = items.filter((i) => i.status === "warning").length;
+
+  const headline = `VPS & Console Detected: ${vpsInfo.providerName} • ${consoleInfo.consoleType}`;
+  const speechText = `Successful! Detected ${vpsInfo.providerName} with active console.`;
+
+  return {
+    timestamp: new Date().toISOString(),
+    overallStatus: "success",
+    summary: {
+      totalChecks: items.length,
+      detectedCount,
+      missingCount,
+      warningCount
+    },
+    headline,
+    speechText,
+    vps: {
+      providerName: vpsInfo.providerName,
+      providerType: vpsInfo.providerType,
+      hypervisor: vpsInfo.hypervisor,
+      details: vpsInfo.details
+    },
+    console: {
+      consoleType: consoleInfo.consoleType,
+      shell: consoleInfo.shell,
+      details: consoleInfo.details,
+      features: consoleInfo.features
+    },
+    items,
+    environment: envInfo
+  };
+}

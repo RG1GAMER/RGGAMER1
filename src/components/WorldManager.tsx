@@ -110,71 +110,7 @@ export default function WorldManager({
         activeName = rawData.activeWorld || "world";
       }
 
-      // Ensure the standard trio (Overworld, Nether, End) always appears clearly
-      const overworldItem = list.find(
-        (w) => w.name === activeName || w.dimension === "overworld" || w.isPrimary
-      ) || {
-        name: activeName,
-        displayName: "World (Overworld)",
-        dimension: "overworld",
-        sizeMB: 0,
-        chunkCount: 0,
-        hasLevelDat: true,
-        worldVersion: "Latest",
-        dataVersion: 3953,
-        optimized: false,
-        hasDatapacks: false,
-        isPrimary: true,
-      };
-
-      const netherItem = list.find(
-        (w) =>
-          w.name === `${activeName}_nether` ||
-          w.dimension === "nether" ||
-          w.name.includes("nether")
-      ) || {
-        name: `${activeName}_nether`,
-        displayName: "World Nether",
-        dimension: "nether",
-        sizeMB: 0,
-        chunkCount: 0,
-        hasLevelDat: false,
-        worldVersion: "Latest",
-        dataVersion: 3953,
-        optimized: false,
-        hasDatapacks: false,
-        isPrimary: false,
-      };
-
-      const endItem = list.find(
-        (w) =>
-          w.name === `${activeName}_the_end` ||
-          w.dimension === "the_end" ||
-          w.name.includes("the_end") ||
-          w.name.includes("end")
-      ) || {
-        name: `${activeName}_the_end`,
-        displayName: "World End",
-        dimension: "the_end",
-        sizeMB: 0,
-        chunkCount: 0,
-        hasLevelDat: false,
-        worldVersion: "Latest",
-        dataVersion: 3953,
-        optimized: false,
-        hasDatapacks: false,
-        isPrimary: false,
-      };
-
-      // Custom other worlds if any
-      const otherWorlds = list.filter(
-        (w) =>
-          w.name !== overworldItem.name &&
-          w.name !== netherItem.name &&
-          w.name !== endItem.name
-      );
-
-      setWorlds([overworldItem, netherItem, endItem, ...otherWorlds]);
+      setWorlds(list);
       setActiveWorldName(activeName);
     } catch (err: any) {
       showToast(err.response?.data?.error || err.message, "error");
@@ -186,6 +122,23 @@ export default function WorldManager({
   useEffect(() => {
     fetchWorldData();
   }, [serverId]);
+
+  const handleStartServerFromWorld = async () => {
+    setIsProcessing(true);
+    setProcessStep("Starting server to initialize world and configuration files...");
+    try {
+      await axios.post(`/api/servers/${serverId}/start`);
+      showToast("Server starting! Generating world and initializing files (Aternos Lifecycle)...", "success");
+      setTimeout(() => {
+        fetchWorldData();
+      }, 4000);
+    } catch (err: any) {
+      showToast(err.response?.data?.error || err.message || "Failed to start server", "error");
+    } finally {
+      setIsProcessing(false);
+      setProcessStep("");
+    }
+  };
 
   // Set Active World
   const handleSetActiveWorld = async (worldName: string) => {
@@ -382,323 +335,219 @@ export default function WorldManager({
         </div>
       )}
 
-      {/* DIMENSION CARDS CONTAINER (Clean Single-Line Format per World) */}
-      <div className="space-y-3">
-        {/* CARD 1: OVERWORLD */}
-        {(() => {
-          const overworld = worlds.find((w) => w.dimension === "overworld" || w.isPrimary) || worlds[0];
-          const name = overworld?.name || "world";
-          const size = overworld?.sizeMB || 0;
-          const chunkCount = overworld?.chunkCount || 0;
+      {/* DIMENSION CARDS CONTAINER */}
+      {worlds.length === 0 ? (
+        <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 rounded-3xl p-8 sm:p-12 text-center space-y-6 shadow-2xl">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-center mx-auto text-rose-500 shadow-inner">
+            <Globe className="w-8 h-8 sm:w-10 sm:h-10" />
+          </div>
 
-          return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Wireframe Globe Icon + Title & Badges + Inline Concise Metadata */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center justify-center shrink-0 text-emerald-400 shadow-inner">
-                    <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
+          <div className="max-w-md mx-auto space-y-2">
+            <h2 className="text-xl sm:text-2xl font-black text-white font-mono">
+              World Not Generated Yet
+            </h2>
+            <p className="text-xs sm:text-sm font-mono text-slate-400 leading-relaxed">
+              Your server world files (Overworld, Nether, The End) will be generated automatically when you start your server for the first time (Aternos-style lifecycle).
+            </p>
+          </div>
 
-                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
-                      World (Overworld)
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
-                      Overworld
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
-                      Active World
-                    </span>
-                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
-                      <span>•</span>
-                      <span>Folder: /{name}</span>
-                      <span>•</span>
-                      <span className="inline-flex items-center gap-1">
-                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                        {size} MB
+          {isProcessing && processStep && (
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-xs font-mono text-rose-300 flex items-center justify-center gap-2 max-w-md mx-auto">
+              <Loader2 className="w-4 h-4 animate-spin text-rose-400" />
+              <span>{processStep}</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <button
+              onClick={handleStartServerFromWorld}
+              disabled={isProcessing || isServerRunning}
+              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-2.5 shadow-lg shadow-emerald-600/30 active:scale-95 disabled:opacity-50"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              {isServerRunning ? "Server is Starting..." : "Start Server & Generate World"}
+            </button>
+
+            <button
+              onClick={() => {
+                setTargetFolderName("world");
+                setShowUploadModal("world");
+              }}
+              disabled={isProcessing}
+              className="px-5 py-3 bg-zinc-900 hover:bg-zinc-800 text-slate-200 border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-2 shadow-sm active:scale-95"
+            >
+              <Upload className="w-4 h-4" />
+              Upload World (ZIP)
+            </button>
+
+            <button
+              onClick={() => {
+                setGenTargetWorld("world");
+                setShowGenerateModal("world");
+              }}
+              disabled={isProcessing}
+              className="px-5 py-3 bg-zinc-900 hover:bg-zinc-800 text-slate-200 border border-white/20 hover:border-white/30 rounded-2xl text-xs sm:text-sm font-mono font-bold transition-all flex items-center gap-2 shadow-sm active:scale-95"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Generate with Seed
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {worlds.map((w) => {
+            const isOverworld = w.dimension === "overworld" || w.isPrimary || w.name === activeWorldName;
+            const isNether = w.dimension === "nether" || w.name.includes("nether");
+            const isEnd = w.dimension === "the_end" || w.name.includes("end");
+
+            const dimColor = isOverworld
+              ? "emerald"
+              : isNether
+              ? "rose"
+              : isEnd
+              ? "purple"
+              : "blue";
+
+            const dimLabel = isOverworld
+              ? "Overworld"
+              : isNether
+              ? "Nether"
+              : isEnd
+              ? "The End"
+              : "Custom";
+
+            const dimTitle = isOverworld
+              ? `${w.displayName || "World"} (Overworld)`
+              : isNether
+              ? `${w.displayName || "World Nether"}`
+              : isEnd
+              ? `${w.displayName || "World End"}`
+              : w.displayName || w.name;
+
+            return (
+              <div
+                key={w.name}
+                className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl"
+              >
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  {/* Left: Dimension Icon + Title & Badges + Metadata */}
+                  <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
+                    <div
+                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl border flex items-center justify-center shrink-0 shadow-inner ${
+                        isOverworld
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                          : isNether
+                          ? "border-rose-500/30 bg-rose-500/10 text-rose-500"
+                          : isEnd
+                          ? "border-purple-500/30 bg-purple-500/10 text-purple-400"
+                          : "border-blue-500/30 bg-blue-500/10 text-blue-400"
+                      }`}
+                    >
+                      {isOverworld ? (
+                        <Globe className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : isNether ? (
+                        <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : isEnd ? (
+                        <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+                      ) : (
+                        <Layers className="w-5 h-5 sm:w-6 sm:h-6" />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                      <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
+                        {dimTitle}
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
+                        {dimLabel}
                       </span>
-                      <span>•</span>
-                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
+                      {w.isPrimary && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
+                          Active World
+                        </span>
+                      )}
+                      <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
+                        <span>•</span>
+                        <span>Folder: /{w.name}</span>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1">
+                          <HardDrive className="w-3.5 h-3.5 text-slate-400" />
+                          {w.sizeMB} MB
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {w.chunkCount} {w.chunkCount === 1 ? "region file" : "region files"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Mobile-only metadata line */}
-                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span>{size} MB</span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
-                </div>
+                  {/* Mobile-only metadata line */}
+                  <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
+                    <span>Folder: /{w.name}</span>
+                    <span>•</span>
+                    <span>{w.sizeMB} MB</span>
+                    <span>•</span>
+                    <span>{w.chunkCount} {w.chunkCount === 1 ? "region" : "regions"}</span>
+                  </div>
 
-                {/* Right: Action Buttons Group */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {/* Upload */}
-                  <button
-                    onClick={() => {
-                      setTargetFolderName(name);
-                      setShowUploadModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Upload
-                  </button>
+                  {/* Right: Action Buttons Group */}
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* Upload */}
+                    <button
+                      onClick={() => {
+                        setTargetFolderName(w.name);
+                        setShowUploadModal(w.name);
+                      }}
+                      className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    >
+                      <Upload className="w-3.5 h-3.5" /> Upload
+                    </button>
 
-                  {/* Download */}
-                  <a
-                    href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
-                    download={`${name}.zip`}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </a>
+                    {/* Download */}
+                    <a
+                      href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(w.name)}`}
+                      download={`${w.name.replace(/\//g, '_')}.zip`}
+                      className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </a>
 
-                  {/* Generate */}
-                  <button
-                    onClick={() => {
-                      setGenTargetWorld(name);
-                      setShowGenerateModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
-                  </button>
+                    {/* Generate */}
+                    <button
+                      onClick={() => {
+                        setGenTargetWorld(w.name);
+                        setShowGenerateModal(w.name);
+                      }}
+                      className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
+                    </button>
 
-                  {/* Optimize */}
-                  <button
-                    onClick={() => setShowOptimizeModal(name)}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
-                  </button>
+                    {/* Optimize */}
+                    <button
+                      onClick={() => setShowOptimizeModal(w.name)}
+                      className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
+                    </button>
+
+                    {!w.isPrimary && (
+                      <button
+                        onClick={() => setShowDeleteModal(w.name)}
+                        className="p-1.5 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-xl transition-all shadow-sm active:scale-95"
+                        title="Delete / Reset Dimension"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })()}
-
-        {/* CARD 2: NETHER */}
-        {(() => {
-          const nether = worlds.find((w) => w.dimension === "nether" || w.name.includes("nether")) || worlds[1];
-          const name = nether?.name || "world_nether";
-          const size = nether?.sizeMB || 0;
-          const chunkCount = nether?.chunkCount || 0;
-
-          return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Flame Icon + Title & Badges + Inline Concise Metadata */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-rose-500/30 bg-rose-500/10 flex items-center justify-center shrink-0 text-rose-500 shadow-inner">
-                    <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
-
-                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
-                      World Nether
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
-                      Nether
-                    </span>
-                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
-                      <span>•</span>
-                      <span>Folder: /{name}</span>
-                      <span>•</span>
-                      <span className="inline-flex items-center gap-1">
-                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                        {size} MB
-                      </span>
-                      <span>•</span>
-                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile-only metadata line */}
-                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span>{size} MB</span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
-                </div>
-
-                {/* Right: Action Buttons Group */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {/* Upload */}
-                  <button
-                    onClick={() => {
-                      setTargetFolderName(name);
-                      setShowUploadModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Upload
-                  </button>
-
-                  {/* Download */}
-                  <a
-                    href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
-                    download={`${name}.zip`}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </a>
-
-                  {/* Generate */}
-                  <button
-                    onClick={() => {
-                      setGenTargetWorld(name);
-                      setShowGenerateModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
-                  </button>
-
-                  {/* Optimize */}
-                  <button
-                    onClick={() => setShowOptimizeModal(name)}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
-                  </button>
-
-                  {/* Play / Reset Icon Button */}
-                  <button
-                    onClick={() => handleOptimizeWorld(name)}
-                    className="p-1.5 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-xl transition-all shadow-sm active:scale-95"
-                    title="Reload dimension chunks"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Trash Icon Button */}
-                  <button
-                    onClick={() => setShowDeleteModal(name)}
-                    className="p-1.5 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-xl transition-all shadow-sm active:scale-95"
-                    title="Delete / Reset Nether Dimension"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* CARD 3: THE END */}
-        {(() => {
-          const end = worlds.find((w) => w.dimension === "the_end" || w.name.includes("end")) || worlds[2];
-          const name = end?.name || "world_the_end";
-          const size = end?.sizeMB || 0;
-          const chunkCount = end?.chunkCount || 0;
-
-          return (
-            <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/15 hover:border-white/25 rounded-2xl p-4 sm:p-5 transition-all shadow-xl">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                {/* Left: Star / Sparkle Icon + Title & Badges + Inline Concise Metadata */}
-                <div className="flex items-center gap-3.5 min-w-0 flex-wrap sm:flex-nowrap">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-purple-500/30 bg-purple-500/10 flex items-center justify-center shrink-0 text-purple-400 shadow-inner">
-                    <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
-
-                  <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                    <h2 className="text-base sm:text-lg font-black text-white font-mono whitespace-nowrap">
-                      World End
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border border-white/20 bg-zinc-900 text-slate-300">
-                      The End
-                    </span>
-                    <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-slate-400 pl-1">
-                      <span>•</span>
-                      <span>Folder: /{name}</span>
-                      <span>•</span>
-                      <span className="inline-flex items-center gap-1">
-                        <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-                        {size} MB
-                      </span>
-                      <span>•</span>
-                      <span>{chunkCount} {chunkCount === 1 ? "region file" : "region files"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile-only metadata line */}
-                <div className="flex sm:hidden items-center gap-2 text-xs font-mono text-slate-400 flex-wrap -mt-2">
-                  <span>Folder: /{name}</span>
-                  <span>•</span>
-                  <span>{size} MB</span>
-                  <span>•</span>
-                  <span>{chunkCount} {chunkCount === 1 ? "region" : "regions"}</span>
-                </div>
-
-                {/* Right: Action Buttons Group */}
-                <div className="flex flex-wrap items-center gap-2 shrink-0">
-                  {/* Upload */}
-                  <button
-                    onClick={() => {
-                      setTargetFolderName(name);
-                      setShowUploadModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Upload className="w-3.5 h-3.5" /> Upload
-                  </button>
-
-                  {/* Download */}
-                  <a
-                    href={`/api/servers/${serverId}/world/download?worldName=${encodeURIComponent(name)}`}
-                    download={`${name}.zip`}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-rose-500/10 text-rose-300/80 hover:text-rose-200 border border-rose-500/30 hover:border-rose-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Download className="w-3.5 h-3.5" /> Download
-                  </a>
-
-                  {/* Generate */}
-                  <button
-                    onClick={() => {
-                      setGenTargetWorld(name);
-                      setShowGenerateModal(name);
-                    }}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-white/5 text-white border border-white/20 hover:border-white/30 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5" /> Generate
-                  </button>
-
-                  {/* Optimize */}
-                  <button
-                    onClick={() => setShowOptimizeModal(name)}
-                    className="px-3.5 py-1.5 bg-transparent hover:bg-amber-500/10 text-amber-300/90 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/50 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                  >
-                    <Zap className="w-3.5 h-3.5 text-amber-400" /> Optimize
-                  </button>
-
-                  {/* Play / Reset Icon Button */}
-                  <button
-                    onClick={() => handleOptimizeWorld(name)}
-                    className="p-1.5 bg-transparent hover:bg-white/5 text-rose-400 border border-rose-500/30 hover:border-rose-500/50 rounded-xl transition-all shadow-sm active:scale-95"
-                    title="Reload dimension chunks"
-                  >
-                    <Play className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Trash Icon Button */}
-                  <button
-                    onClick={() => setShowDeleteModal(name)}
-                    className="p-1.5 bg-transparent hover:bg-rose-950/40 text-slate-300 hover:text-rose-300 border border-white/20 hover:border-rose-500/40 rounded-xl transition-all shadow-sm active:scale-95"
-                    title="Delete / Reset End Dimension"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* OPTIMIZE MODAL */}
       {showOptimizeModal && (

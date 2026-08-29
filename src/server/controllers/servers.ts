@@ -36,13 +36,30 @@ import {
   addPlayitAudit,
   getTrackedPlayerCount
 } from "../services/playitHealth.js";
+import { ensureDefaultWorldStructure, ensureAternosStandardServerFiles } from "./world.js";
+
+export const isUserServerAuthorized = (user: any, server: any): boolean => {
+  if (!user || !server) return false;
+  if (user.role === "admin" || user.role === "owner") return true;
+  if (server.owner && String(server.owner) === String(user.id)) return true;
+  if (server.ownerId && String(server.ownerId) === String(user.id)) return true;
+  if (user.username) {
+    const un = user.username.toLowerCase();
+    if (server.owner && typeof server.owner === "string" && server.owner.toLowerCase() === un) return true;
+    if (server.ownerId && typeof server.ownerId === "string" && server.ownerId.toLowerCase() === un) return true;
+    if (server.ownerUsername && typeof server.ownerUsername === "string" && server.ownerUsername.toLowerCase() === un) return true;
+  }
+  return false;
+};
 
 export const getServers = async (req: Request, res: Response) => {
   const user = (req as any).user;
   const servers = await readJSON("servers.json") || [];
   
-  // Filter for normal users
-  const userServers = user.role === "admin" || user.role === "owner" ? servers : servers.filter((s: any) => s.owner === user.id);
+  // Filter for normal users with comprehensive authorization
+  const userServers = (user.role === "admin" || user.role === "owner") 
+    ? servers 
+    : servers.filter((s: any) => isUserServerAuthorized(user, s));
 
   // Update statuses
   const updatedServers = await Promise.all(userServers.map(async (server: any) => {
@@ -75,7 +92,7 @@ export const getServer = async (req: Request, res: Response) => {
     res.status(404).json({ error: "Server not found" });
     return;
   }
-  if (user.role !== "admin" && user.role !== "owner" && server.owner !== user.id) {
+  if (!isUserServerAuthorized(user, server)) {
     return res.status(403).json({ error: "Forbidden" });
   }
 
@@ -103,7 +120,7 @@ export const getServerStats = async (req: Request, res: Response) => {
     res.status(404).json({ error: "Server not found" });
     return;
   }
-  if (user.role !== "admin" && user.role !== "owner" && server.owner !== user.id) {
+  if (!isUserServerAuthorized(user, server)) {
     return res.status(403).json({ error: "Forbidden" });
   }
 
@@ -262,6 +279,8 @@ export const createServer = async (req: Request, res: Response) => {
       id,
       name,
       owner: assignedOwner,
+      ownerId: assignedOwner,
+      ownerUsername: user.username || "",
       ram,
       cpu: cpu || 100,
       disk: disk || 10,
@@ -325,13 +344,19 @@ export const createServer = async (req: Request, res: Response) => {
         }
       } else {
         // Minecraft / Proxy servers
-        const eulaPath = path.join(serverDir, "eula.txt");
-        if (!fs.existsSync(eulaPath)) {
-          await fs.writeFile(eulaPath, "eula=true\n");
-        }
-        const propsPath = path.join(serverDir, "server.properties");
-        if (!fs.existsSync(propsPath)) {
-          await fs.writeFile(propsPath, `server-port=${numericPort}\nmotd=${name || "A Minecraft Server"}\n`);
+        const isProxy = ["VELOCITY", "BUNGEECORD", "WATERFALL"].includes(upperType);
+        if (!isProxy) {
+          await ensureAternosStandardServerFiles(serverDir, { port: numericPort, name, levelName: "world" });
+        } else {
+          const eulaPath = path.join(serverDir, "eula.txt");
+          if (!fs.existsSync(eulaPath)) {
+            await fs.writeFile(eulaPath, "eula=true\n");
+          }
+          const propsPath = path.join(serverDir, "server.properties");
+          if (!fs.existsSync(propsPath)) {
+            await fs.writeFile(propsPath, `server-port=${numericPort}\nmotd=${name || "A Minecraft Server"}\n`);
+          }
+          await fs.ensureDir(path.join(serverDir, "plugins"));
         }
         const jarPath = path.join(serverDir, "server.jar");
         if (!fs.existsSync(jarPath)) {
@@ -350,7 +375,13 @@ export const createServer = async (req: Request, res: Response) => {
       const containerId = await createServerRuntime(serverData);
       serverData.containerId = containerId;
       serverData.status = "offline";
-      await writeJSON("servers.json", Object.assign(servers, servers.map((s:any)=>s.id===id?serverData:s)));
+      
+      const currentServers = await readJSON("servers.json") || [];
+      const updatedList = currentServers.map((s: any) => s.id === id ? serverData : s);
+      if (!updatedList.some((s: any) => s.id === id)) {
+        updatedList.push(serverData);
+      }
+      await writeJSON("servers.json", updatedList);
       await createSftpUser(id).catch(e => console.error("SFTP user creation failed:", e));
       res.json(serverData);
     } catch (err: any) {
@@ -486,16 +517,29 @@ export const startServer = async (req: Request, res: Response) => {
             panelEvents.emit("log", id, `[JTG System] Notice: Automatic JAR download error: ${dlErr?.message || dlErr}\r\n`);
           }
         }
+        const isProxy = ["VELOCITY", "BUNGEECORD", "WATERFALL"].includes(targetType);
+        if (!isProxy) {
+          await ensureAternosStandardServerFiles(serverDir, server);
+        } else {
+          const eulaPath = path.join(serverDir, "eula.txt");
+          if (!fs.existsSync(eulaPath)) {
+            await fs.writeFile(eulaPath, "eula=true\n");
+          }
+          const propsPath = path.join(serverDir, "server.properties");
+          if (!fs.existsSync(propsPath)) {
+            await fs.writeFile(propsPath, `server-port=${server.port || 25565}\nmotd=${server.name || "A Minecraft Server"}\n`);
+          }
+          await fs.ensureDir(path.join(serverDir, "plugins"));
+        }
+
+        const pluginsDir = path.join(serverDir, "plugins");
+        const modsDir = path.join(serverDir, "mods");
         const eulaPath = path.join(serverDir, "eula.txt");
-        if (!fs.existsSync(eulaPath)) {
-          await fs.writeFile(eulaPath, "eula=true\n");
-        }
         const propsPath = path.join(serverDir, "server.properties");
-        if (!fs.existsSync(propsPath)) {
-          await fs.writeFile(propsPath, `server-port=${server.port}\nmotd=${server.name || "A Minecraft Server"}\n`);
-        }
-        await secureFilePermissions(eulaPath);
-        await secureFilePermissions(propsPath);
+        await secureDirectoryPermissions(pluginsDir);
+        await secureDirectoryPermissions(modsDir);
+        if (fs.existsSync(eulaPath)) await secureFilePermissions(eulaPath);
+        if (fs.existsSync(propsPath)) await secureFilePermissions(propsPath);
         if (fs.existsSync(jarPath)) {
           await secureExecutablePermissions(jarPath);
         }

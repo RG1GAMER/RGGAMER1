@@ -7,11 +7,20 @@ import util from "util";
 const execPromise = util.promisify(exec);
 import { readJSON, writeJSON } from "../services/db.js";
 import bcrypt from "bcryptjs";
-import { detectEnvironment } from "../services/environmentDetector.js";
+import { detectEnvironment, performDeepAutoDetection } from "../services/environmentDetector.js";
 
 const router = express.Router();
 
 router.use(requireAuth);
+
+router.get("/auto-detect", async (req, res) => {
+  try {
+    const report = await performDeepAutoDetection();
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: "Auto-detection failed", details: err?.message || err });
+  }
+});
 
 router.get("/environment", async (req, res) => {
   try {
@@ -343,25 +352,90 @@ router.put("/settings", async (req, res) => {
   res.json({ success: true, defaultRuntime: settings.defaultRuntime });
 });
 
+router.get("/update/check", async (req, res) => {
+  try {
+    const user = (req as any).user;
+    if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+    const { checkPanelUpdates } = await import("../services/updater.js");
+    const status = await checkPanelUpdates(req.query.force === "true");
+    res.json(status);
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to check for updates", details: err?.message || err });
+  }
+});
+
 router.post("/update", async (req, res) => {
   const user = (req as any).user;
   if(user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden"});
 
-  // Broadcast to all clients to refresh in a few seconds
   const io = req.app.get("io");
-  if (io) {
-    io.emit("system_update_started");
-  }
+  const forceRebuild = req.body?.forceRebuild === true;
+  const stashChanges = req.body?.stashChanges === true;
 
-  res.json({ success: true, message: "Update process started" });
+  try {
+    const { executePanelUpdate } = await import("../services/updater.js");
+    
+    // Broadcast initiation
+    if (io) {
+      io.emit("system_update_started", {
+        initiatedBy: user.username,
+        forceRebuild,
+        timestamp: Date.now()
+      });
+    }
 
-  const { exec } = await import("child_process");
-  setTimeout(() => {
-    exec("bash update.sh", (error, stdout, stderr) => {
-      console.log(`Update stdout: ${stdout}`);
-      console.error(`Update stderr: ${stderr}`);
+    // Launch update execution asynchronously
+    executePanelUpdate({ forceRebuild, stashChanges }, io).then((result) => {
+      if (result.success) {
+        console.log("[Updater] Panel update finished successfully:", result.message);
+      } else {
+        console.error("[Updater] Panel update finished with error:", result.error);
+      }
+    }).catch((err) => {
+      console.error("[Updater] Panel update execution failure:", err);
+      if (io) {
+        io.emit("system_update_error", { error: err.message || String(err) });
+      }
     });
-  }, 1000);
+
+    res.json({
+      success: true,
+      message: forceRebuild ? "Rebuild process started" : "Update process started",
+      status: "running"
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to start update", details: err?.message || err });
+  }
+});
+
+router.post("/update/rebuild", async (req, res) => {
+  const user = (req as any).user;
+  if(user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden"});
+
+  const io = req.app.get("io");
+  try {
+    const { executePanelUpdate } = await import("../services/updater.js");
+    
+    if (io) {
+      io.emit("system_update_started", {
+        initiatedBy: user.username,
+        forceRebuild: true,
+        timestamp: Date.now()
+      });
+    }
+
+    executePanelUpdate({ forceRebuild: true }, io).catch((err) => {
+      console.error("[Updater] Rebuild failure:", err);
+      if (io) {
+        io.emit("system_update_error", { error: err.message || String(err) });
+      }
+    });
+
+    res.json({ success: true, message: "Rebuild process started", status: "running" });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to start rebuild", details: err?.message || err });
+  }
 });
 
 

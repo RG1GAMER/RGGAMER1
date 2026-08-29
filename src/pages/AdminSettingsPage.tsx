@@ -15,6 +15,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import AdminControls from '../components/AdminControls';
 import { ImageCropper } from "../components/ImageCropper";
 import { LoadingOverlay } from "../components/LoadingOverlay";
+import SystemAutoDetection from "../components/SystemAutoDetection";
+import { SystemUpdateManager } from "../components/SystemUpdateManager";
 import { initializeApp, deleteApp } from "firebase/app";
 
 export default function AdminSettingsPage(): React.ReactElement {
@@ -1757,32 +1759,16 @@ export default function AdminSettingsPage(): React.ReactElement {
                   )}
         
                   {/* ========================================================================= */}
-                  {/* TAB 4: SYSTEM (System Updates & Maintenance)                              */}
+                  {/* TAB 4: SYSTEM (System Auto Detection & Maintenance)                        */}
                   {/* ========================================================================= */}
                   {activeTab === "system" && (
-                    <section className="bg-card border border-border-subtle rounded-2xl p-6 md:p-8 shadow-xl">
-                      <div className="mb-6 border-b border-border-subtle pb-4">
-                        <h2 className="text-xl font-bold flex items-center text-foreground">
-                          <RefreshCw className="mr-3 text-theme-500 w-5 h-5" /> System Update & Maintenance
-                        </h2>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Manage core system updates, rebuilds, and maintenance procedures for the JTG Panel.
-                        </p>
-                      </div>
-                      <div className="relative z-10">
-                        <p className="text-muted-foreground text-sm mb-6 max-w-2xl">
-                          Trigger an automatic update of the JTG Panel. This will run git pull and rebuild the system. The panel will be unavailable for a few seconds during this process.
-                        </p>
-                        <button 
-                          onClick={handleSystemUpdate}
-                          disabled={isUpdatingSystem}
-                          className="px-6 py-2.5 bg-theme-600/10 hover:bg-theme-600/20 text-theme-500 font-medium rounded-xl border border-theme-600/20 transition-all shadow-sm flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <RefreshCw className={`w-4 h-4 mr-2 ${isUpdatingSystem ? "animate-spin" : ""}`} />
-                          {isUpdatingSystem ? "Updating System..." : "Update Panel"}
-                        </button>
-                      </div>
-                    </section>
+                    <div className="space-y-8">
+                      {/* Auto-Detection & Diagnostics Section (Above Update Panel) */}
+                      <SystemAutoDetection />
+
+                      {/* System Update & Maintenance Section */}
+                      <SystemUpdateManager panelName={panelName} />
+                    </div>
                   )}
               </motion.div>
             </div>

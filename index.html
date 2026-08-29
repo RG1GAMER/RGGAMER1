@@ -8,6 +8,18 @@
     <meta name="description" content="A web-based game server management panel with file manager, terminal access, and playit.gg integration." />
     <meta property="og:title" content="JTG Panel" />
     <meta property="og:description" content="A web-based game server management panel with file manager, terminal access, and playit.gg integration." />
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('jtg_theme');
+          if (t) document.documentElement.setAttribute('data-theme', t);
+          var b = localStorage.getItem('jtg_button_color');
+          if (b) document.documentElement.setAttribute('data-button-color', b);
+          var u = localStorage.getItem('jtg_ui_theme');
+          if (u) document.documentElement.setAttribute('data-ui-theme', u);
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

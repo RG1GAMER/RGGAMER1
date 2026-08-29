@@ -9,6 +9,7 @@ import { downloadJar } from "./jarDownloader.js";
 import { panelEvents } from "../events.js";
 import { getServerDiskUsageGB, calculateLocalMemoryStats } from "./metrics.js";
 import { readJSON } from "./db.js";
+import { ensureDefaultWorldStructure, ensureAternosStandardServerFiles } from "../controllers/world.js";
 
 const execAsync = promisify(exec);
 const processes = new Map<string, ChildProcess>();
@@ -209,14 +210,8 @@ export const createLocalServer = async (serverData: any) => {
       await fs.writeFile(configPath, `listeners:\n- query_port: ${serverData.port || 25577}\n  host: 0.0.0.0:${serverData.port || 25577}\n  max_players: 1000\n`);
     }
   } else {
-    // Standard Minecraft server
-    const eulaPath = path.join(serverPath, "eula.txt");
-    await fs.writeFile(eulaPath, "eula=true\n");
-
-    const propsPath = path.join(serverPath, "server.properties");
-    if (!await fs.pathExists(propsPath)) {
-      await fs.writeFile(propsPath, `server-port=${serverData.port || 25565}\n`);
-    }
+    // Standard Minecraft server - ensure all Aternos standard root files & world structure
+    await ensureAternosStandardServerFiles(serverPath, serverData);
   }
 
   const jarPath = path.join(serverPath, "server.jar");
@@ -422,9 +417,71 @@ export const startLocalServer = async (id: string, serverData: any) => {
       }
     }
 
-    // Ensure EULA is accepted
-    const eulaPath = path.join(serverPath, "eula.txt");
-    await fs.writeFile(eulaPath, "eula=true\n");
+    // Ensure all standard Aternos files & directories exist
+    await ensureAternosStandardServerFiles(serverPath, serverData);
+
+    // Check if this is the first start
+    const initMarkerPath = path.join(serverPath, ".initialized");
+    const worldPath = path.join(serverPath, "world");
+    const isFirstStart = !fs.existsSync(initMarkerPath) && !fs.existsSync(worldPath);
+
+    const pluginsDir = path.join(serverPath, "plugins");
+    const modsDir = path.join(serverPath, "mods");
+
+    // Scan for plugins/mods to load
+    let pluginFiles: string[] = [];
+    try {
+      if (fs.existsSync(pluginsDir)) {
+        const files = await fs.readdir(pluginsDir);
+        pluginFiles = files.filter(f => f.toLowerCase().endsWith(".jar") && !f.toLowerCase().endsWith(".disabled"));
+      }
+    } catch {}
+
+    let modFiles: string[] = [];
+    try {
+      if (fs.existsSync(modsDir)) {
+        const files = await fs.readdir(modsDir);
+        modFiles = files.filter(f => f.toLowerCase().endsWith(".jar") && !f.toLowerCase().endsWith(".disabled"));
+      }
+    } catch {}
+
+    if (isFirstStart) {
+      // Ensure world directory and initial level structure are generated
+      await ensureDefaultWorldStructure(serverPath, "world");
+      logMessage(`=======================================================`);
+      logMessage(`🚀 First-Time Server Startup (Aternos Lifecycle)`);
+      logMessage(`⚙️  Initializing server environment, configuration, and world...`);
+      logMessage(`🌍 Generating Overworld, Nether, and The End dimensions (/world)`);
+      if (pluginFiles.length > 0) {
+        logMessage(`🧩 Loading ${pluginFiles.length} initial plugin(s):`);
+        for (const p of pluginFiles) {
+          logMessage(`   -> ${p}`);
+        }
+      }
+      if (modFiles.length > 0) {
+        logMessage(`📦 Loading ${modFiles.length} initial mod(s):`);
+        for (const m of modFiles) {
+          logMessage(`   -> ${m}`);
+        }
+      }
+      logMessage(`=======================================================`);
+      await fs.writeFile(initMarkerPath, `initializedAt=${new Date().toISOString()}\nversion=${serverData.version || "latest"}\ntype=${type}\n`);
+    } else {
+      logMessage(`⚡ Starting server (Existing Installation)...`);
+      logMessage(`📁 Preserving world data and server configurations.`);
+      if (pluginFiles.length > 0) {
+        logMessage(`🧩 Synchronizing and loading ${pluginFiles.length} plugin(s):`);
+        for (const p of pluginFiles) {
+          logMessage(`   -> ${p}`);
+        }
+      }
+      if (modFiles.length > 0) {
+        logMessage(`📦 Synchronizing and loading ${modFiles.length} mod(s):`);
+        for (const m of modFiles) {
+          logMessage(`   -> ${m}`);
+        }
+      }
+    }
 
     const memoryMb = Math.round((serverData.ram || 2) * 1024);
     const javaBin = await resolveJavaBinary(serverData, logMessage);

@@ -1,21 +1,24 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
 export const SettingsContext = createContext<any>(null);
 
 export const SettingsProvider = ({ children }: { children: React.ReactNode }) => {
-  const [panelName, setPanelName] = useState<string>("JTG Panel");
-  const [panelLogo, setPanelLogo] = useState<string>("");
-  const [panelBackgroundImage, setPanelBackgroundImage] = useState<string>("");
-  const [panelBackgroundBlur, setPanelBackgroundBlur] = useState<number>(10);
+  const [panelName, setPanelName] = useState<string>(() => localStorage.getItem("jtg_panel_name") || "JTG Panel");
+  const [panelLogo, setPanelLogo] = useState<string>(() => localStorage.getItem("jtg_panel_logo") || "");
+  const [panelBackgroundImage, setPanelBackgroundImage] = useState<string>(() => localStorage.getItem("jtg_panel_bg") || "");
+  const [panelBackgroundBlur, setPanelBackgroundBlur] = useState<number>(() => {
+    const v = localStorage.getItem("jtg_panel_blur");
+    return v ? parseInt(v, 10) : 10;
+  });
   const [enablePlayit, setEnablePlayit] = useState<boolean>(false);
   const [enableTutorial, setEnableTutorial] = useState<boolean>(true);
   const [enableLoginAnimation, setEnableLoginAnimation] = useState<boolean>(true);
   const [enableRegistration, setEnableRegistration] = useState<boolean>(true);
-  const [theme, setTheme] = useState<string>("red");
-  const [buttonColor, setButtonColor] = useState<string>("theme");
-  const [uiTheme, setUiTheme] = useState<string>("dark");
+  const [theme, setThemeState] = useState<string>(() => localStorage.getItem("jtg_theme") || "red");
+  const [buttonColor, setButtonColorState] = useState<string>(() => localStorage.getItem("jtg_button_color") || "theme");
+  const [uiTheme, setUiThemeState] = useState<string>(() => localStorage.getItem("jtg_ui_theme") || "dark");
   const [enableGoogleLogin, setEnableGoogleLogin] = useState<boolean>(false);
   const [firebaseApiKey, setFirebaseApiKey] = useState<string>("");
   const [firebaseAuthDomain, setFirebaseAuthDomain] = useState<string>("");
@@ -34,56 +37,103 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   const [maxRecoveryAttempts, setMaxRecoveryAttempts] = useState<number>(3);
   const [allowRecoveryWhilePlayersOnline, setAllowRecoveryWhilePlayersOnline] = useState<boolean>(false);
 
+  const setTheme = useCallback((val: string, syncToServer = false) => {
+    const finalVal = val || "red";
+    setThemeState(finalVal);
+    try {
+      localStorage.setItem("jtg_theme", finalVal);
+      document.documentElement.setAttribute("data-theme", finalVal);
+      if (syncToServer) {
+        axios.put("/api/system/settings", { theme: finalVal }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const setButtonColor = useCallback((val: string, syncToServer = false) => {
+    const finalVal = val || "theme";
+    setButtonColorState(finalVal);
+    try {
+      localStorage.setItem("jtg_button_color", finalVal);
+      document.documentElement.setAttribute("data-button-color", finalVal);
+      if (syncToServer) {
+        axios.put("/api/system/settings", { buttonColor: finalVal }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
+  const setUiTheme = useCallback((val: string, syncToServer = false) => {
+    const finalVal = val || "dark";
+    setUiThemeState(finalVal);
+    try {
+      localStorage.setItem("jtg_ui_theme", finalVal);
+      document.documentElement.setAttribute("data-ui-theme", finalVal);
+      if (syncToServer) {
+        axios.put("/api/system/settings", { uiTheme: finalVal }).catch(() => {});
+      }
+    } catch {}
+  }, []);
+
   const fetchSettings = async () => {
     try {
       const res = await axios.get("/api/settings");
-      if (res.data.panelName) setPanelName(res.data.panelName);
-      if (res.data.panelLogo !== undefined) setPanelLogo(res.data.panelLogo);
-      if (res.data.panelBackgroundImage !== undefined) setPanelBackgroundImage(res.data.panelBackgroundImage);
-      if (res.data.panelBackgroundBlur !== undefined) setPanelBackgroundBlur(res.data.panelBackgroundBlur);
-      if (res.data.enablePlayit !== undefined) setEnablePlayit(res.data.enablePlayit);
-      if (res.data.enableTutorial !== undefined) setEnableTutorial(res.data.enableTutorial);
-      if (res.data.enableLoginAnimation !== undefined) setEnableLoginAnimation(res.data.enableLoginAnimation);
-      if (res.data.enableRegistration !== undefined) setEnableRegistration(res.data.enableRegistration);
-      if (res.data.enableGoogleLogin !== undefined) setEnableGoogleLogin(res.data.enableGoogleLogin);
-      if (res.data.firebaseApiKey !== undefined) setFirebaseApiKey(res.data.firebaseApiKey);
-      if (res.data.firebaseAuthDomain !== undefined) setFirebaseAuthDomain(res.data.firebaseAuthDomain);
-      if (res.data.firebaseProjectId !== undefined) setFirebaseProjectId(res.data.firebaseProjectId);
-      if (res.data.firebaseStorageBucket !== undefined) setFirebaseStorageBucket(res.data.firebaseStorageBucket);
-      if (res.data.firebaseMessagingSenderId !== undefined) setFirebaseMessagingSenderId(res.data.firebaseMessagingSenderId);
-      if (res.data.firebaseAppId !== undefined) setFirebaseAppId(res.data.firebaseAppId);
-      if (res.data.defaultRuntime !== undefined) setDefaultRuntime(res.data.defaultRuntime);
-      if (res.data.runtimeLocked !== undefined) setRuntimeLocked(res.data.runtimeLocked);
-      if (res.data.environment !== undefined) setEnvironment(res.data.environment);
-      if (res.data.isDev !== undefined) setIsDev(res.data.isDev);
-      if (res.data.playitServiceMode !== undefined) setPlayitServiceMode(res.data.playitServiceMode);
-      if (res.data.playitServiceName !== undefined) setPlayitServiceName(res.data.playitServiceName);
-      if (res.data.healthCheckIntervalMinutes !== undefined) setHealthCheckIntervalMinutes(res.data.healthCheckIntervalMinutes);
-      if (res.data.restartDelaySeconds !== undefined) setRestartDelaySeconds(res.data.restartDelaySeconds);
-      if (res.data.maxRecoveryAttempts !== undefined) setMaxRecoveryAttempts(res.data.maxRecoveryAttempts);
-      if (res.data.allowRecoveryWhilePlayersOnline !== undefined) setAllowRecoveryWhilePlayersOnline(res.data.allowRecoveryWhilePlayersOnline);
-      if (res.data.theme !== undefined) {
-        setTheme(res.data.theme);
-        document.documentElement.setAttribute("data-theme", res.data.theme || "red");
-      } else {
-        document.documentElement.setAttribute("data-theme", "red");
-      }
-      if (res.data.buttonColor !== undefined) {
-        setButtonColor(res.data.buttonColor);
-        document.documentElement.setAttribute("data-button-color", res.data.buttonColor || "theme");
-      } else {
-        document.documentElement.setAttribute("data-button-color", "theme");
-      }
-      if (res.data.uiTheme !== undefined) {
-        setUiTheme(res.data.uiTheme);
-        document.documentElement.setAttribute("data-ui-theme", res.data.uiTheme || "dark");
-      } else {
-        document.documentElement.setAttribute("data-ui-theme", "dark");
+      if (res.data) {
+        if (res.data.panelName) {
+          setPanelName(res.data.panelName);
+          localStorage.setItem("jtg_panel_name", res.data.panelName);
+        }
+        if (res.data.panelLogo !== undefined) {
+          setPanelLogo(res.data.panelLogo);
+          localStorage.setItem("jtg_panel_logo", res.data.panelLogo || "");
+        }
+        if (res.data.panelBackgroundImage !== undefined) {
+          setPanelBackgroundImage(res.data.panelBackgroundImage);
+          localStorage.setItem("jtg_panel_bg", res.data.panelBackgroundImage || "");
+        }
+        if (res.data.panelBackgroundBlur !== undefined) {
+          setPanelBackgroundBlur(res.data.panelBackgroundBlur);
+          localStorage.setItem("jtg_panel_blur", String(res.data.panelBackgroundBlur));
+        }
+        if (res.data.enablePlayit !== undefined) setEnablePlayit(res.data.enablePlayit);
+        if (res.data.enableTutorial !== undefined) setEnableTutorial(res.data.enableTutorial);
+        if (res.data.enableLoginAnimation !== undefined) setEnableLoginAnimation(res.data.enableLoginAnimation);
+        if (res.data.enableRegistration !== undefined) setEnableRegistration(res.data.enableRegistration);
+        if (res.data.enableGoogleLogin !== undefined) setEnableGoogleLogin(res.data.enableGoogleLogin);
+        if (res.data.firebaseApiKey !== undefined) setFirebaseApiKey(res.data.firebaseApiKey);
+        if (res.data.firebaseAuthDomain !== undefined) setFirebaseAuthDomain(res.data.firebaseAuthDomain);
+        if (res.data.firebaseProjectId !== undefined) setFirebaseProjectId(res.data.firebaseProjectId);
+        if (res.data.firebaseStorageBucket !== undefined) setFirebaseStorageBucket(res.data.firebaseStorageBucket);
+        if (res.data.firebaseMessagingSenderId !== undefined) setFirebaseMessagingSenderId(res.data.firebaseMessagingSenderId);
+        if (res.data.firebaseAppId !== undefined) setFirebaseAppId(res.data.firebaseAppId);
+        if (res.data.defaultRuntime !== undefined) setDefaultRuntime(res.data.defaultRuntime);
+        if (res.data.runtimeLocked !== undefined) setRuntimeLocked(res.data.runtimeLocked);
+        if (res.data.environment !== undefined) setEnvironment(res.data.environment);
+        if (res.data.isDev !== undefined) setIsDev(res.data.isDev);
+        if (res.data.playitServiceMode !== undefined) setPlayitServiceMode(res.data.playitServiceMode);
+        if (res.data.playitServiceName !== undefined) setPlayitServiceName(res.data.playitServiceName);
+        if (res.data.healthCheckIntervalMinutes !== undefined) setHealthCheckIntervalMinutes(res.data.healthCheckIntervalMinutes);
+        if (res.data.restartDelaySeconds !== undefined) setRestartDelaySeconds(res.data.restartDelaySeconds);
+        if (res.data.maxRecoveryAttempts !== undefined) setMaxRecoveryAttempts(res.data.maxRecoveryAttempts);
+        if (res.data.allowRecoveryWhilePlayersOnline !== undefined) setAllowRecoveryWhilePlayersOnline(res.data.allowRecoveryWhilePlayersOnline);
+        
+        if (res.data.theme) {
+          setTheme(res.data.theme);
+        }
+        if (res.data.buttonColor) {
+          setButtonColor(res.data.buttonColor);
+        }
+        if (res.data.uiTheme) {
+          setUiTheme(res.data.uiTheme);
+        }
       }
     } catch (e) {}
   };
 
   useEffect(() => {
+    // Synchronously apply initial theme attributes immediately
+    document.documentElement.setAttribute("data-theme", theme || "red");
+    document.documentElement.setAttribute("data-button-color", buttonColor || "theme");
+    document.documentElement.setAttribute("data-ui-theme", uiTheme || "dark");
+
     fetchSettings();
     const token = localStorage.getItem("jtg_token") || localStorage.getItem("token");
     if (!token) return;
@@ -167,3 +217,4 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
 };
 
 export const useSettings = () => useContext(SettingsContext);
+

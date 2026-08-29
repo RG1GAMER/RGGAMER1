@@ -4,7 +4,7 @@
   "version": "3.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --ignore .data --ignore backups --ignore .logs server.ts",
+    "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "createuser": "tsx scripts/createuser.ts",
