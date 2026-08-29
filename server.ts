@@ -119,33 +119,6 @@ import { startPlayitHealthMonitor } from "./src/server/services/playitHealth.js"
 import { detectEnvironment } from "./src/server/services/environmentDetector.js";
 
 async function startServer() {
-  try {
-    const envInfo = await detectEnvironment();
-    console.log("==================================================");
-    console.log(`🚀 JTG Panel Host Environment Auto-Detected:`);
-    console.log(`   Type: ${envInfo.environmentName} [${envInfo.environmentBadge}]`);
-    console.log(`   Platform: ${envInfo.distro || envInfo.platform} (${envInfo.arch}) | Cores: ${envInfo.hardware.cpuCores} | RAM: ${envInfo.hardware.totalMemoryGB} GB`);
-    console.log(`   Recommended Runtime: ${envInfo.recommendedRuntime.toUpperCase()}`);
-    console.log(`   Docker Engine: ${envInfo.capabilities.dockerAvailable ? `Available (${envInfo.capabilities.dockerVersion || 'Yes'})` : 'Not Detected (Using Native High-Performance Local Process)'}`);
-    console.log(`   Java: ${envInfo.capabilities.javaAvailable ? envInfo.capabilities.javaVersion : 'Adoptium JRE Auto-Installer Active'}`);
-    console.log(`   Local IP: ${envInfo.capabilities.localIp || '127.0.0.1'} | Public IP: ${envInfo.capabilities.publicIp || 'Auto-tunnel ready'}`);
-    console.log("==================================================");
-  } catch (envErr) {
-    console.warn("[Env Auto-Detect] Notice:", envErr);
-  }
-
-  try {
-    await initSFTPServer();
-  } catch (err: any) {
-    console.warn("[SFTP Init] Warning:", err?.message || err);
-  }
-
-  try {
-    await startPlayitHealthMonitor();
-  } catch (err: any) {
-    console.warn("[Playit Init] Warning:", err?.message || err);
-  }
-
   const isProduction = process.env.NODE_ENV === "production" || process.argv[1]?.includes('server.cjs');
 
   if (!isProduction) {
@@ -164,6 +137,29 @@ async function startServer() {
 
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`JTG Panel running on port ${PORT}`);
+  });
+
+  // Non-blocking background service initialization
+  detectEnvironment().then((envInfo) => {
+    console.log("==================================================");
+    console.log(`🚀 JTG Panel Host Environment Auto-Detected:`);
+    console.log(`   Type: ${envInfo.environmentName} [${envInfo.environmentBadge}]`);
+    console.log(`   Platform: ${envInfo.distro || envInfo.platform} (${envInfo.arch}) | Cores: ${envInfo.hardware.cpuCores} | RAM: ${envInfo.hardware.totalMemoryGB} GB`);
+    console.log(`   Recommended Runtime: ${envInfo.recommendedRuntime.toUpperCase()}`);
+    console.log(`   Docker Engine: ${envInfo.capabilities.dockerAvailable ? `Available (${envInfo.capabilities.dockerVersion || 'Yes'})` : 'Not Detected (Using Native High-Performance Local Process)'}`);
+    console.log(`   Java: ${envInfo.capabilities.javaAvailable ? envInfo.capabilities.javaVersion : 'Adoptium JRE Auto-Installer Active'}`);
+    console.log(`   Local IP: ${envInfo.capabilities.localIp || '127.0.0.1'} | Public IP: ${envInfo.capabilities.publicIp || 'Auto-tunnel ready'}`);
+    console.log("==================================================");
+  }).catch((envErr) => {
+    console.warn("[Env Auto-Detect] Notice:", envErr?.message || envErr);
+  });
+
+  initSFTPServer().catch((err: any) => {
+    console.warn("[SFTP Init] Warning:", err?.message || err);
+  });
+
+  startPlayitHealthMonitor().catch((err: any) => {
+    console.warn("[Playit Init] Warning:", err?.message || err);
   });
 }
 
