@@ -177,8 +177,11 @@ const ServerCard = memo(function ServerCard({
             <h2 className="truncate text-lg font-semibold tracking-tight text-foreground">
               {server.name}
             </h2>
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
               <StatusBadge status={server.status} />
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-400" title="This server is permanent and will never be automatically deleted">
+                ∞ Permanent
+              </span>
               {isSuspended && (
                 <span className="inline-flex items-center gap-1 rounded-md border border-theme-500/20 bg-theme-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-theme-400 uppercase">
                   <Lock className="h-3 w-3" />

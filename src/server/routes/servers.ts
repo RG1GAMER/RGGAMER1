@@ -16,7 +16,7 @@ import {
   saveResourcePackSettings
 } from "../controllers/world.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar } from "../controllers/servers.js";
+import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, uploadExternalBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar } from "../controllers/servers.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -104,6 +104,7 @@ router.delete("/:id/files", deleteFile);
 // Backup endpoints
 router.get("/:id/backups", getBackups);
 router.post("/:id/backups", createBackup);
+router.post("/:id/backups/upload", upload.single("file") as any, handleUploadError, uploadExternalBackup);
 router.get("/:id/backups/:filename", downloadBackup);
 router.delete("/:id/backups/:filename", deleteBackup);
 router.post("/:id/backups/:filename/restore", restoreBackup);

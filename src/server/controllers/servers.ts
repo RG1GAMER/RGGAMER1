@@ -41,6 +41,8 @@ import { ensureDefaultWorldStructure, ensureAternosStandardServerFiles } from ".
 export const isUserServerAuthorized = (user: any, server: any): boolean => {
   if (!user || !server) return false;
   if (user.role === "admin" || user.role === "owner") return true;
+  // If server has no owner specified, it belongs to the active user or panel
+  if (!server.owner && !server.ownerId && !server.ownerUsername) return true;
   if (server.owner && String(server.owner) === String(user.id)) return true;
   if (server.ownerId && String(server.ownerId) === String(user.id)) return true;
   if (user.username) {
@@ -296,6 +298,10 @@ export const createServer = async (req: Request, res: Response) => {
       startupCommand: startupCommand || "",
       theme: theme || "default",
       status: "installing",
+      isPermanent: true,
+      lifespan: "infinity",
+      autoDelete: false,
+      expiresAt: null,
       createdAt: new Date().toISOString(),
       containerId: null as string | null,
     };
@@ -2454,6 +2460,328 @@ export const migrateServerRuntime = async (req: Request, res: Response) => {
 
 
 
+/**
+ * Helper to normalize, extract, sync settings, and structure server files from an extracted backup directory
+ */
+export async function applyAndSyncServerBackupPayload(
+  extractedDir: string,
+  serverDir: string,
+  serverData: any,
+  options: { preservePort?: boolean; cleanExisting?: boolean } = {}
+) {
+  const { preservePort = true, cleanExisting = true } = options;
+
+  // 1. Locate the actual server root inside extractedDir
+  // Many backups (Aternos, Pterodactyl, FalixNodes, ZIPs) wrap files in an outer folder
+  let payloadDir = extractedDir;
+  
+  // Check if current directory has indicators of a Minecraft server root
+  const isServerRoot = async (dir: string): Promise<boolean> => {
+    const hasProps = await fs.pathExists(path.join(dir, "server.properties"));
+    const hasWorld = (await fs.pathExists(path.join(dir, "world"))) || (await fs.pathExists(path.join(dir, "region"))) || (await fs.pathExists(path.join(dir, "level.dat")));
+    const hasPlugins = await fs.pathExists(path.join(dir, "plugins"));
+    const hasMods = await fs.pathExists(path.join(dir, "mods"));
+    const files = await fs.readdir(dir).catch(() => []);
+    const hasJar = files.some((f) => f.endsWith(".jar"));
+    const hasConfig = (await fs.pathExists(path.join(dir, "config"))) || (await fs.pathExists(path.join(dir, "spigot.yml"))) || (await fs.pathExists(path.join(dir, "bukkit.yml")));
+    return hasProps || hasWorld || hasPlugins || hasMods || hasJar || hasConfig;
+  };
+
+  if (!(await isServerRoot(extractedDir))) {
+    // Look 1 level deep inside subdirectories
+    const subdirs = (await fs.readdir(extractedDir, { withFileTypes: true })).filter((d) => d.isDirectory());
+    for (const sub of subdirs) {
+      const candidate = path.join(extractedDir, sub.name);
+      if (await isServerRoot(candidate)) {
+        payloadDir = candidate;
+        break;
+      }
+    }
+  }
+
+  // 2. Prepare destination server directory
+  await fs.ensureDir(serverDir);
+  if (cleanExisting) {
+    // Remove old files except critical session lock or runtime logs
+    const existing = await fs.readdir(serverDir);
+    for (const item of existing) {
+      if (item !== ".logs" && item !== "server.log") {
+        await fs.remove(path.join(serverDir, item));
+      }
+    }
+  }
+
+  // 3. Copy all files from payloadDir to serverDir
+  await fs.copy(payloadDir, serverDir, { overwrite: true });
+
+  // 4. Handle nested world folders (e.g. if the backup was ONLY a world zip with region/ and level.dat at root)
+  const rootHasRegion = await fs.pathExists(path.join(serverDir, "region"));
+  const rootHasLevelDat = await fs.pathExists(path.join(serverDir, "level.dat"));
+  if (rootHasRegion || rootHasLevelDat) {
+    // Move region, data, entities, poi, level.dat into world/
+    const targetWorldDir = path.join(serverDir, "world");
+    await fs.ensureDir(targetWorldDir);
+    const worldItems = ["region", "data", "entities", "poi", "datapacks", "level.dat", "level.dat_old", "session.lock", "advancements", "stats", "playerdata", "DIM-1", "DIM1"];
+    for (const wItem of worldItems) {
+      const srcP = path.join(serverDir, wItem);
+      const dstP = path.join(targetWorldDir, wItem);
+      if (await fs.pathExists(srcP) && srcP !== dstP) {
+        await fs.move(srcP, dstP, { overwrite: true });
+      }
+    }
+  }
+
+  // 5. Deep server.properties Parsing & Synchronization
+  const propsPath = path.join(serverDir, "server.properties");
+  const extractedProps: Record<string, string> = {};
+  
+  if (await fs.pathExists(propsPath)) {
+    const rawProps = await fs.readFile(propsPath, "utf-8");
+    const lines = rawProps.split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const k = trimmed.substring(0, eqIdx).trim();
+        const v = trimmed.substring(eqIdx + 1).trim();
+        extractedProps[k] = v;
+      }
+    }
+  }
+
+  // Determine updated server metadata
+  const servers = (await readJSON("servers.json")) || [];
+  const sIdx = servers.findIndex((s: any) => s.id === serverData.id);
+  const updatedServer = sIdx !== -1 ? { ...servers[sIdx] } : { ...serverData };
+
+  // Sync properties into server object
+  if (extractedProps["motd"]) updatedServer.motd = extractedProps["motd"];
+  if (extractedProps["level-name"]) updatedServer.levelName = extractedProps["level-name"];
+  if (extractedProps["gamemode"]) updatedServer.gamemode = extractedProps["gamemode"];
+  if (extractedProps["difficulty"]) updatedServer.difficulty = extractedProps["difficulty"];
+  if (extractedProps["max-players"]) updatedServer.maxPlayers = parseInt(extractedProps["max-players"], 10) || 20;
+  if (extractedProps["online-mode"]) updatedServer.onlineMode = extractedProps["online-mode"] === "true";
+  if (extractedProps["pvp"]) updatedServer.pvp = extractedProps["pvp"] !== "false";
+  if (extractedProps["allow-flight"]) updatedServer.allowFlight = extractedProps["allow-flight"] === "true";
+  if (extractedProps["enable-command-block"]) updatedServer.enableCommandBlock = extractedProps["enable-command-block"] === "true";
+  if (extractedProps["hardcore"]) updatedServer.hardcore = extractedProps["hardcore"] === "true";
+
+  // Re-write clean standardized server.properties (keeping network port assigned by panel)
+  const finalPort = preservePort ? (serverData.port || 25565) : (parseInt(extractedProps["server-port"], 10) || serverData.port || 25565);
+  const levelName = extractedProps["level-name"] || updatedServer.levelName || "world";
+
+  const standardProps = [
+    `# Minecraft Server Properties - Restored from External Backup`,
+    `server-port=${finalPort}`,
+    `server-ip=0.0.0.0`,
+    `motd=${extractedProps["motd"] || updatedServer.motd || updatedServer.name || "A Minecraft Server"}`,
+    `level-name=${levelName}`,
+    `gamemode=${extractedProps["gamemode"] || "survival"}`,
+    `difficulty=${extractedProps["difficulty"] || "easy"}`,
+    `pvp=${extractedProps["pvp"] || "true"}`,
+    `max-players=${extractedProps["max-players"] || "20"}`,
+    `online-mode=${extractedProps["online-mode"] || "false"}`,
+    `allow-flight=${extractedProps["allow-flight"] || "true"}`,
+    `enable-command-block=${extractedProps["enable-command-block"] || "true"}`,
+    `spawn-protection=${extractedProps["spawn-protection"] || "0"}`,
+    `view-distance=${extractedProps["view-distance"] || "10"}`,
+    `simulation-distance=${extractedProps["simulation-distance"] || "10"}`,
+    `enable-query=true`,
+    `query.port=${finalPort}`,
+    `enable-rcon=${extractedProps["enable-rcon"] || "false"}`,
+    `white-list=${extractedProps["white-list"] || "false"}`,
+    `enforce-whitelist=${extractedProps["enforce-whitelist"] || "false"}`,
+    `hardcore=${extractedProps["hardcore"] || "false"}`,
+    `level-seed=${extractedProps["level-seed"] || ""}`,
+    `level-type=${extractedProps["level-type"] || "minecraft:normal"}`
+  ].join("\n");
+
+  await fs.writeFile(propsPath, standardProps, "utf-8");
+
+  // 6. EULA Verification
+  const eulaPath = path.join(serverDir, "eula.txt");
+  await fs.writeFile(eulaPath, "eula=true\n", "utf-8");
+
+  // 7. Ensure Standard Aternos & Minecraft files (ops, whitelist, banned-players, bukkit, spigot)
+  await ensureAternosStandardServerFiles(serverDir, updatedServer);
+  await ensureDefaultWorldStructure(serverDir, levelName);
+
+  // 8. Auto-detect Server Software & JAR
+  const filesInDir = await fs.readdir(serverDir);
+  const jarFiles = filesInDir.filter((f) => f.endsWith(".jar"));
+  
+  let detectedSoftware = updatedServer.type || "PAPER";
+  let detectedJar: string | undefined = jarFiles.find((f) => f === "server.jar");
+
+  if (!detectedJar && jarFiles.length > 0) {
+    // Pick the most likely server engine jar
+    const engineJar = jarFiles.find((f) => 
+      f.toLowerCase().includes("paper") ||
+      f.toLowerCase().includes("purpur") ||
+      f.toLowerCase().includes("spigot") ||
+      f.toLowerCase().includes("forge") ||
+      f.toLowerCase().includes("fabric") ||
+      f.toLowerCase().includes("server")
+    ) || jarFiles[0];
+
+    if (engineJar) {
+      detectedJar = engineJar;
+      const lower = engineJar.toLowerCase();
+      if (lower.includes("paper")) detectedSoftware = "PAPER";
+      else if (lower.includes("purpur")) detectedSoftware = "PURPUR";
+      else if (lower.includes("spigot")) detectedSoftware = "SPIGOT";
+      else if (lower.includes("fabric")) detectedSoftware = "FABRIC";
+      else if (lower.includes("forge")) detectedSoftware = "FORGE";
+      else if (lower.includes("velocity")) detectedSoftware = "VELOCITY";
+      else if (lower.includes("bungee")) detectedSoftware = "BUNGEECORD";
+
+      // Symlink or copy to server.jar if server.jar is missing
+      const serverJarPath = path.join(serverDir, "server.jar");
+      if (!fs.existsSync(serverJarPath)) {
+        await fs.copy(path.join(serverDir, engineJar), serverJarPath);
+      }
+    }
+  }
+
+  // Update server in database
+  updatedServer.type = detectedSoftware;
+  if (sIdx !== -1) {
+    servers[sIdx] = updatedServer;
+    await writeJSON("servers.json", servers);
+  }
+
+  // 9. Recursively set proper permissions
+  await secureDirectoryPermissions(serverDir);
+
+  // 10. Compute detection summary stats
+  const pluginsDir = path.join(serverDir, "plugins");
+  let pluginsFound = 0;
+  if (await fs.pathExists(pluginsDir)) {
+    const pFiles = await fs.readdir(pluginsDir);
+    pluginsFound = pFiles.filter((f) => f.endsWith(".jar")).length;
+  }
+
+  const modsDir = path.join(serverDir, "mods");
+  let modsFound = 0;
+  if (await fs.pathExists(modsDir)) {
+    const mFiles = await fs.readdir(modsDir);
+    modsFound = mFiles.filter((f) => f.endsWith(".jar")).length;
+  }
+
+  const worldsFound: string[] = [];
+  for (const f of filesInDir) {
+    const fullP = path.join(serverDir, f);
+    if ((await fs.stat(fullP)).isDirectory()) {
+      if ((await fs.pathExists(path.join(fullP, "region"))) || (await fs.pathExists(path.join(fullP, "level.dat"))) || f === levelName || f.startsWith(`${levelName}_`)) {
+        worldsFound.push(f);
+      }
+    }
+  }
+
+  const configsFound = filesInDir.filter((f) => f.endsWith(".yml") || f.endsWith(".json") || f.endsWith(".properties") || f.endsWith(".toml")).length;
+
+  return {
+    server: updatedServer,
+    summary: {
+      serverName: updatedServer.name,
+      motd: updatedServer.motd || extractedProps["motd"] || "A Minecraft Server",
+      gamemode: updatedServer.gamemode || "survival",
+      difficulty: updatedServer.difficulty || "easy",
+      activeWorld: levelName,
+      maxPlayers: updatedServer.maxPlayers || 20,
+      detectedSoftware,
+      pluginsFound,
+      modsFound,
+      worldsFound,
+      configsFound,
+      totalFilesRestored: filesInDir.length
+    }
+  };
+}
+
+export const uploadExternalBackup = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { action = "restore_and_apply", preservePort = "true" } = req.body;
+  const shouldPreservePort = preservePort === "true" || preservePort === true;
+  const shouldRestore = action === "restore_and_apply" || action === "restore";
+
+  if (!req.file) {
+    return res.status(400).json({ error: "No backup archive file uploaded." });
+  }
+
+  const uploadedFilePath = req.file.path;
+  const originalName = req.file.originalname || `backup-${Date.now()}.zip`;
+  const cleanOriginalName = originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  const serverDir = path.join(process.cwd(), ".data", "servers", id);
+  const backupsDir = path.join(process.cwd(), ".data", "backups", id);
+  await fs.ensureDir(backupsDir);
+
+  try {
+    const servers = (await readJSON("servers.json")) || [];
+    const server = servers.find((s: any) => s.id === id);
+    if (!server) {
+      if (fs.existsSync(uploadedFilePath)) await fs.remove(uploadedFilePath);
+      return res.status(404).json({ error: "Server not found" });
+    }
+
+    if (shouldRestore) {
+      const status = await getServerRuntimeStatus({ id } as any);
+      if (status?.State?.Running) {
+        if (fs.existsSync(uploadedFilePath)) await fs.remove(uploadedFilePath);
+        return res.status(400).json({ error: "Please stop the server before uploading and restoring a backup." });
+      }
+    }
+
+    // Store a permanent copy in .data/backups/:id for user records
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const storedBackupFilename = `uploaded_${timestamp}_${cleanOriginalName.endsWith(".zip") ? cleanOriginalName : `${cleanOriginalName}.zip`}`;
+    const storedBackupPath = path.join(backupsDir, storedBackupFilename);
+    await fs.copy(uploadedFilePath, storedBackupPath);
+    await secureFilePermissions(storedBackupPath);
+
+    if (!shouldRestore) {
+      // Just save to backups directory
+      if (fs.existsSync(uploadedFilePath)) await fs.remove(uploadedFilePath);
+      return res.json({
+        success: true,
+        action: "saved",
+        filename: storedBackupFilename,
+        message: `Backup archive '${cleanOriginalName}' saved successfully to your backups repository.`
+      });
+    }
+
+    // Extract to a temporary directory
+    const tempExtractDir = path.join(process.cwd(), ".data", "temp", `extract_backup_${Date.now()}`);
+    await fs.ensureDir(tempExtractDir);
+    await extractArchive(uploadedFilePath, tempExtractDir);
+
+    // Apply & Synchronize Server settings, files, worlds, and properties
+    const result = await applyAndSyncServerBackupPayload(tempExtractDir, serverDir, server, {
+      preservePort: shouldPreservePort,
+      cleanExisting: true
+    });
+
+    // Clean up temporary files
+    await fs.remove(tempExtractDir);
+    if (fs.existsSync(uploadedFilePath)) await fs.remove(uploadedFilePath);
+
+    res.json({
+      success: true,
+      action: "restored",
+      filename: storedBackupFilename,
+      message: `External server backup '${cleanOriginalName}' extracted and configured successfully!`,
+      details: result.summary,
+      server: result.server
+    });
+  } catch (err: any) {
+    if (fs.existsSync(uploadedFilePath)) await fs.remove(uploadedFilePath).catch(() => {});
+    console.error("Upload external backup error:", err);
+    res.status(500).json({ error: err.message || "Failed to process external server backup" });
+  }
+};
+
 export const restoreBackup = async (req: Request, res: Response) => {
   const { id, filename } = req.params;
   const serverDir = path.join(process.cwd(), ".data", "servers", id);
@@ -2465,32 +2793,38 @@ export const restoreBackup = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Backup not found" });
     }
 
+    const servers = (await readJSON("servers.json")) || [];
+    const server = servers.find((s: any) => s.id === id);
+    if (!server) {
+      return res.status(404).json({ error: "Server not found" });
+    }
+
     const status = await getServerRuntimeStatus({ id } as any);
     if (status?.State?.Running) {
       return res.status(400).json({ error: "Please stop the server before restoring a backup." });
     }
 
-    // Clean current directory except some critical things if needed, but for full restore, we empty it
-    await fs.emptyDir(serverDir);
+    // Extract to a temporary directory to perform smart detection & synchronization
+    const tempExtractDir = path.join(process.cwd(), ".data", "temp", `restore_${Date.now()}`);
+    await fs.ensureDir(tempExtractDir);
+    await extractArchive(backupPath, tempExtractDir);
 
-    const extract = require("extract-zip");
-    await extract(backupPath, { dir: serverDir });
-    
-    // Check if there was a server_config_snapshot.json and apply it
-    const configSnapshot = path.join(serverDir, "server_config_snapshot.json");
-    if (fs.existsSync(configSnapshot)) {
-        const oldConfig = await readJSON(configSnapshot);
-        const servers = await readJSON("servers.json");
-        const idx = servers.findIndex((s: any) => s.id === id);
-        if (idx !== -1) {
-            servers[idx] = { ...servers[idx], ...oldConfig };
-            await writeJSON("servers.json", servers);
-        }
-        await fs.remove(configSnapshot);
-    }
+    // Apply & Synchronize
+    const result = await applyAndSyncServerBackupPayload(tempExtractDir, serverDir, server, {
+      preservePort: true,
+      cleanExisting: true
+    });
 
-    res.json({ success: true });
+    await fs.remove(tempExtractDir);
+
+    res.json({
+      success: true,
+      message: "Server restored and all settings synchronized successfully!",
+      details: result.summary,
+      server: result.server
+    });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error("Restore backup error:", err);
+    res.status(500).json({ error: err.message || "Failed to restore backup" });
   }
 };

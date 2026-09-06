@@ -268,12 +268,15 @@ export default function ServerView() {
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 custom-scrollbar">
           {/* Status & Quick Actions */}
           <div className="mb-4 p-3 bg-muted/60 rounded-xl border border-theme-500/20 shadow-inner">
-             <div className="flex items-center space-x-2 mb-3">
+             <div className="flex items-center space-x-2 mb-3 flex-wrap gap-y-1">
                 <span className="flex h-2.5 w-2.5 relative shrink-0">
                    {server.status === 'online' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-400 opacity-75"></span>}
                    <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${server.status === 'online' ? 'bg-theme-500' : 'bg-red-500'}`}></span>
                 </span>
                 <span className={`text-xs font-semibold capitalize ${server.status === 'online' ? 'text-theme-400' : 'text-zinc-400'}`}>{server.status}</span>
+                <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.2 rounded" title="Permanent Server - Infinite Lifespan">
+                  ∞ Permanent
+                </span>
                 <span className="text-xs text-zinc-600">•</span>
                 <button onClick={handleCopyIp} className="flex items-center space-x-1.5 px-2 py-0.5 rounded-md bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 transition-colors group cursor-pointer truncate" title="Copy Connection Info">
                   <span className="text-[11px] font-mono text-theme-300 group-hover:text-theme-200 transition-colors truncate">

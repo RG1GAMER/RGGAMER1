@@ -122,10 +122,13 @@ export default function AdminServers() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">{server.name}</h3>
-                  <div className="flex gap-3 text-sm text-muted-foreground mt-1">
+                  <div className="flex gap-3 text-sm text-muted-foreground mt-1 items-center flex-wrap">
                     <span>{server.type} • {server.version}</span>
                     <span>Owner: {getUsername(server.owner)}</span>
-                    {server.suspended && <span className="text-theme-400 font-bold ml-2">SUSPENDED</span>}
+                    <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                      ∞ Permanent
+                    </span>
+                    {server.suspended && <span className="text-theme-400 font-bold ml-1">SUSPENDED</span>}
                   </div>
                 </div>
               </div>
