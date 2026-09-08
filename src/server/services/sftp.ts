@@ -12,6 +12,13 @@ const SFTP_DB_FILE = "sftp_users.json";
 
 // Initialize SSH keys and DB
 export async function initSFTPServer() {
+  // If running in Google Cloud Run or serverless container, Cloud Run only forwards the main HTTP ingress port.
+  // Port 6868 cannot receive external connections and attempting to bind may cause sandbox or EADDRINUSE warnings.
+  if (process.env.K_SERVICE || process.env.CLOUD_RUN_JOB) {
+    console.log("[SFTP Server] Cloud Run container environment detected. SFTP port binding bypassed.");
+    return;
+  }
+
   await fs.ensureDir(HOST_KEYS_DIR);
   
   let hostKeyPath = path.join(HOST_KEYS_DIR, "host_rsa");

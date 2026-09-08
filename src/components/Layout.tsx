@@ -1,35 +1,75 @@
 import React, { useState, useEffect } from "react";
 import { Sidebar } from "./Sidebar";
-import { Menu, ChevronRight } from "lucide-react";
+import { Menu, ChevronRight, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 import { useLocation, matchPath, Link } from "react-router-dom";
 import { useSettings } from "../context/SettingsContext";
 import GlobalSearchModal from "./GlobalSearchModal";
 import NotificationsDropdown from "./NotificationsDropdown";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem("jtg_main_sidebar_collapsed") === "true";
+  });
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const location = useLocation();
   const { panelName, panelLogo } = useSettings();
+
+  const handleSlideAway = () => {
+    setIsCollapsed(true);
+    localStorage.setItem("jtg_main_sidebar_collapsed", "true");
+    setDrawerOpen(false);
+  };
+
+  const handleRestoreSidebar = () => {
+    setIsCollapsed(false);
+    localStorage.setItem("jtg_main_sidebar_collapsed", "false");
+    setDrawerOpen(false);
+  };
+
+  const toggleSidebarMenu = () => {
+    setDrawerOpen(prev => !prev);
+  };
 
   const pName = panelName || 'JTG PANEL';
   const nameParts = pName.split(' ');
   const firstWord = nameParts[0]?.toUpperCase() || 'JTG';
   const restWords = nameParts.slice(1).join(' ').toUpperCase();
 
+  // Responsive mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setDrawerOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
+  // Automatically dismiss mobile menu whenever navigating to any page ("jab click kar da to hat ja")
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleToggle = () => {
-      if (window.innerWidth < 768) {
-        setMobileOpen(prev => !prev);
+      if (window.innerWidth >= 768) {
+        if (isCollapsed) {
+          setDrawerOpen(prev => !prev);
+        } else {
+          handleSlideAway();
+        }
       } else {
-        setIsCollapsed(prev => !prev);
+        setDrawerOpen(prev => !prev);
       }
     };
     window.addEventListener('toggle-sidebar', handleToggle);
     return () => window.removeEventListener('toggle-sidebar', handleToggle);
-  }, []);
+  }, [isCollapsed]);
 
   const isServerView = matchPath("/servers/:id/*", location.pathname) && !matchPath("/servers/create", location.pathname);
   const isCreateServer = matchPath("/servers/create", location.pathname);
@@ -59,46 +99,88 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={`flex h-[100dvh] w-full bg-transparent text-foreground font-sans overflow-hidden selection:bg-theme-600/30`}>
-      {/* Mobile Sidebar Overlay */}
-      {mobileOpen && (
+      {/* Backdrop Overlay for Slide Drawer (Mobile and Desktop in Full Slide mode) */}
+      {drawerOpen && (
         <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 transition-opacity duration-300 cursor-pointer"
+          onClick={() => setDrawerOpen(false)}
+          title="Click to dismiss menu"
         />
       )}
       
-      {/* Sidebar Container */}
-      <div className={`fixed inset-y-0 left-0 z-50 transform flex-shrink-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out`}>
-        <Sidebar onClose={() => setMobileOpen(false)} isCollapsed={isCollapsed} toggleCollapse={() => setIsCollapsed(!isCollapsed)} />
+      {/* Slide Drawer (Mobile & Desktop Full Slide mode) - Slides in and auto-hides when any option is clicked */}
+      <div 
+        className={`fixed inset-y-0 left-0 z-50 flex-shrink-0 transition-transform duration-300 ease-in-out ${
+          drawerOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
+        }`}
+      >
+        <Sidebar 
+          isDrawer={true} 
+          onClose={() => setDrawerOpen(false)} 
+          toggleCollapse={handleRestoreSidebar} 
+        />
+      </div>
+
+      {/* Desktop Persistent Docked Sidebar (Only visible when NOT in Full Slide mode) */}
+      <div 
+        className={`hidden md:flex flex-shrink-0 transition-all duration-300 ease-in-out relative ${
+          isCollapsed ? 'w-0 -translate-x-full opacity-0 pointer-events-none overflow-hidden border-r-0' : 'w-64 translate-x-0 opacity-100'
+        }`}
+      >
+        {!isCollapsed && (
+          <Sidebar 
+            isDrawer={false} 
+            toggleCollapse={handleSlideAway} 
+          />
+        )}
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-transparent">
         
-        {/* NAV */}
-        <header className="sticky top-0 z-40 border-b border-line bg-ink backdrop-blur-md flex-shrink-0">
-            <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+        {/* NAV: Sticky Top Header */}
+        <header className="sticky top-0 z-40 border-b border-line bg-ink/95 backdrop-blur-md flex-shrink-0 shadow-sm">
+            <div className="px-3 sm:px-6 h-16 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                    {/* 3-Lines Hamburger Menu Button */}
+                    {/* ONLY VISIBLE ON DESKTOP WHEN SLID AWAY / FULL SLIDE MODE (prevents duplicate button when docked!) */}
                     <button 
-                        onClick={() => window.dispatchEvent(new CustomEvent('toggle-sidebar'))}
-                        className="md:hidden p-2 -ml-2 text-dim hover:text-white hover:bg-line/50 rounded-lg transition-colors cursor-pointer flex items-center justify-center"
-                        title="Toggle Sidebar Menu"
-                        aria-label="Toggle Sidebar Menu"
+                        onClick={toggleSidebarMenu}
+                        className={`p-2.5 rounded-xl transition-all cursor-pointer items-center justify-center shrink-0 shadow-sm active:scale-95 ${
+                            isCollapsed 
+                                ? 'flex bg-theme-500/25 border border-theme-400 text-theme-100 ring-2 ring-theme-500/40 shadow-theme-500/25' 
+                                : 'flex md:hidden bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border border-theme-500/30 text-theme-300 hover:text-white'
+                        }`}
+                        title={isCollapsed ? "Show Navigation Options (3 Lines)" : "Menu"}
+                        aria-label="Toggle Navigation Menu"
                     >
-                        <Menu className="w-5 h-5" />
+                        <Menu className="w-5 h-5 text-theme-400" />
                     </button>
+
                     {/* Show logo in top bar for all screens */}
-                    <Link to="/" className="flex items-center gap-3 group">
+                    <Link to="/" className="flex items-center gap-2.5 group min-w-0">
                         {panelLogo ? (
-                            <img src={panelLogo} alt="Logo" className="w-7 h-7 object-contain" />
+                            <img src={panelLogo} alt="Logo" className="w-7 h-7 object-contain shrink-0" />
                         ) : (
-                            <div className="w-7 h-7 bg-white flex items-center justify-center group-hover:rotate-45 transition-transform duration-500">
-                                <div className="w-3.5 h-3.5 bg-black"></div>
+                            <div className="w-7 h-7 rounded-lg bg-theme-600 text-white flex items-center justify-center group-hover:rotate-45 transition-transform duration-500 shadow-sm shadow-theme-600/25 shrink-0">
+                                <div className="w-3.5 h-3.5 bg-white/90 rounded-sm"></div>
                             </div>
                         )}
-                        <span className="font-display font-bold text-lg tracking-wide uppercase text-white">{firstWord} {restWords && <span className="text-dim font-medium">{restWords}</span>}</span>
+                        <span className="font-display font-bold text-base sm:text-lg tracking-wide uppercase text-foreground truncate">{firstWord} {restWords && <span className="text-dim font-medium">{restWords}</span>}</span>
                     </Link>
+
+                    {/* Desktop Full-Slide Mode Indicator Badge */}
+                    {isCollapsed && (
+                        <button 
+                            onClick={handleRestoreSidebar}
+                            className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-theme-500/15 hover:bg-theme-500/25 border border-theme-500/35 text-[11px] font-mono text-theme-300 font-medium cursor-pointer transition-colors shadow-sm"
+                            title="Click to restore sidebar to docked view"
+                        >
+                            <PanelLeftOpen className="w-3.5 h-3.5 text-theme-400" />
+                            <span>Full Slide</span>
+                        </button>
+                    )}
                 </div>
-                <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+                <div className="flex items-center gap-2 sm:gap-4 ml-auto shrink-0">
                     {/* ALL SYSTEMS GO status badge (no timer) */}
                     <div className="hidden md:flex items-center gap-2 font-mono text-[10px] text-dim tracking-widest mr-4 px-3 py-1.5 rounded bg-panel/50 border border-line">
                         <span className="w-1.5 h-1.5 bg-theme-500 rounded-full pulse-dot"></span> ALL SYSTEMS GO
@@ -118,6 +200,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           )}
         </main>
       </div>
+
+      {/* Desktop Quick-Expand Edge Slide Tab when in Full Slide mode */}
+      {isCollapsed && (
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 p-2 pl-1.5 pr-2.5 rounded-r-xl bg-card/95 hover:bg-theme-600 text-theme-300 hover:text-white shadow-2xl border-y border-r border-theme-500/40 backdrop-blur-xl transition-all duration-200 group items-center gap-1 cursor-pointer select-none"
+          title="Slide Out JTG Panel Menu Options"
+        >
+          <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform text-theme-400 group-hover:text-white" />
+          <span className="text-[10px] font-mono font-bold tracking-wider uppercase [writing-mode:vertical-lr] rotate-180 py-1">
+            Menu
+          </span>
+        </button>
+      )}
     </div>
   );
 }

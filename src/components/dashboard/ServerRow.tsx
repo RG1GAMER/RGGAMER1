@@ -6,10 +6,10 @@ import { ServerSummary, ServerStatus } from "../../types/dashboard";
 import { useRipple, RippleLayer, EASE_OUT_EXPO } from "./Shared";
 
 const STATUS_MAP: Record<ServerStatus, { dot: string; label: string; text: string }> = {
-  online: { dot: "bg-theme-500 shadow-[0_0_12px_rgba(var(--theme-rgb-500),0.8)]", label: "text-theme-500", text: "Online" },
-  starting: { dot: "bg-theme-500 shadow-[0_0_12px_rgba(var(--theme-rgb-500),0.8)]", label: "text-theme-500", text: "Starting" },
-  error: { dot: "bg-theme-400 shadow-[0_0_12px_rgba(251,113,133,0.8)]", label: "text-theme-400", text: "Error" },
-  offline: { dot: "bg-zinc-500", label: "text-muted-foreground", text: "Offline" },
+  online: { dot: "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)]", label: "text-red-400 font-bold", text: "Online" },
+  starting: { dot: "bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.8)]", label: "text-amber-400 font-bold", text: "Starting" },
+  error: { dot: "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)]", label: "text-red-400 font-bold", text: "Error" },
+  offline: { dot: "bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]", label: "text-blue-400 font-bold", text: "Offline" },
 };
 
 export function ServerRow({ server, index }: { server: ServerSummary; index: number; key?: React.Key }) {

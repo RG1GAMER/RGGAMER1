@@ -10,6 +10,7 @@ import { panelEvents } from "../events.js";
 import { getServerDiskUsageGB, calculateLocalMemoryStats } from "./metrics.js";
 import { readJSON } from "./db.js";
 import { ensureDefaultWorldStructure, ensureAternosStandardServerFiles } from "../controllers/world.js";
+import { secureDirectoryPermissions } from "../utils/permissions.js";
 
 const execAsync = promisify(exec);
 const processes = new Map<string, ChildProcess>();
@@ -170,69 +171,12 @@ export const resolveNodeBinary = async (): Promise<string> => {
 export const createLocalServer = async (serverData: any) => {
   const serverPath = path.join(process.cwd(), ".data", "servers", serverData.id);
   await fs.ensureDir(serverPath);
+  await secureDirectoryPermissions(serverPath);
 
-  const type = (serverData.type || "paper").toLowerCase();
-
-  if (type === "nodejs" || type === "node") {
-    const indexPath = path.join(serverPath, "index.js");
-    const pkgPath = path.join(serverPath, "package.json");
-    if (!await fs.pathExists(indexPath)) {
-      await fs.writeFile(indexPath, `// Node.js Application on JTG Panel\nconst http = require('http');\nconst port = process.env.PORT || process.env.SERVER_PORT || ${serverData.port || 3000};\n\nconsole.log('==============================================');\nconsole.log('🚀 Node.js Application Running on port ' + port);\nconsole.log('Node Version: ' + process.version);\nconsole.log('Upload your files in File Manager to customize!');\nconsole.log('==============================================');\n\nconst server = http.createServer((req, res) => {\n  res.writeHead(200, { 'Content-Type': 'application/json' });\n  res.end(JSON.stringify({ status: 'online', runtime: 'node.js', time: new Date().toISOString() }));\n});\n\nserver.listen(port, '0.0.0.0', () => {\n  console.log(\`[Server] Listening on http://0.0.0.0:\${port}\`);\n});\n`);
-    }
-    if (!await fs.pathExists(pkgPath)) {
-      await fs.writeFile(pkgPath, JSON.stringify({
-        name: (serverData.name || "node-app").toLowerCase().replace(/[^a-z0-9_-]/g, '-'),
-        version: "1.0.0",
-        description: "Node.js application hosted on JTG Panel",
-        main: "index.js",
-        scripts: { "start": "node index.js" }
-      }, null, 2));
-    }
-    return `local-${serverData.id}`;
-  } else if (type === "python" || type === "python3") {
-    const mainPath = path.join(serverPath, "main.py");
-    const reqPath = path.join(serverPath, "requirements.txt");
-    if (!await fs.pathExists(mainPath)) {
-      await fs.writeFile(mainPath, `# Python Application on JTG Panel\nimport os\nimport sys\nfrom http.server import HTTPServer, BaseHTTPRequestHandler\n\nport = int(os.environ.get("SERVER_PORT", os.environ.get("PORT", ${serverData.port || 8000})))\nprint("==============================================", flush=True)\nprint("🐍 Python Application Running", flush=True)\nprint(f"Python Version: {sys.version}", flush=True)\nprint(f"Listening Port: {port}", flush=True)\nprint("Upload your files in File Manager to customize!", flush=True)\nprint("==============================================", flush=True)\n\nclass RequestHandler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        self.send_response(200)\n        self.send_header('Content-type', 'application/json')\n        self.end_headers()\n        self.wfile.write(b'{"status": "online", "runtime": "python"}')\n\n    def log_message(self, format, *args):\n        print(f"[{self.log_date_time_string()}] {format % args}", flush=True)\n\nserver = HTTPServer(('0.0.0.0', port), RequestHandler)\nprint(f"[Server] Listening on http://0.0.0.0:{port}", flush=True)\ntry:\n    server.serve_forever()\nexcept KeyboardInterrupt:\n    print("\\nStopping server...", flush=True)\n    server.server_close()\n`);
-    }
-    if (!await fs.pathExists(reqPath)) {
-      await fs.writeFile(reqPath, "# Add python dependencies here\n");
-    }
-    return `local-${serverData.id}`;
-  } else if (type === "velocity") {
-    const configPath = path.join(serverPath, "velocity.toml");
-    if (!await fs.pathExists(configPath)) {
-      await fs.writeFile(configPath, `bind = "0.0.0.0:${serverData.port || 25577}"\nmotd = "&#09add3A Velocity Server"\n`);
-    }
-  } else if (type === "bungeecord" || type === "waterfall") {
-    const configPath = path.join(serverPath, "config.yml");
-    if (!await fs.pathExists(configPath)) {
-      await fs.writeFile(configPath, `listeners:\n- query_port: ${serverData.port || 25577}\n  host: 0.0.0.0:${serverData.port || 25577}\n  max_players: 1000\n`);
-    }
-  } else {
-    // Standard Minecraft server - ensure all Aternos standard root files & world structure
-    await ensureAternosStandardServerFiles(serverPath, serverData);
-  }
-
-  const jarPath = path.join(serverPath, "server.jar");
-  let needDownload = false;
-  if (!await fs.pathExists(jarPath)) {
-    needDownload = true;
-  } else {
-    const stat = await fs.stat(jarPath);
-    if (stat.size < 500 * 1024) {
-      needDownload = true;
-    }
-  }
-
-  if (needDownload) {
-    try {
-      await downloadJar(type, serverData.version || "latest", jarPath);
-    } catch (e: any) {
-      console.warn(`[Local Server] Deferred JAR download: ${e.message}`);
-    }
-  }
-
+  // In accordance with Aternos architecture:
+  // On server creation, the directory and file manager start completely empty.
+  // When the user starts the server for the first time, startLocalServer will automatically download the JAR,
+  // create server.properties, eula.txt, generate the world dimensions, and generate configuration files.
   return `local-${serverData.id}`;
 };
 

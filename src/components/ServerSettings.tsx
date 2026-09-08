@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"; 
 import { LoadingOverlay } from "../components/LoadingOverlay";
 import DeleteServerModal from "./DeleteServerModal";
-import { Trash2, AlertTriangle, User, Save, Globe, RefreshCw, Sliders, Lock, Network, Key, Copy, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Trash2, AlertTriangle, User, Save, Globe, RefreshCw, Sliders, Lock, Network, Key, Copy, Check, Eye, EyeOff, ShieldCheck, ShieldAlert } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -728,26 +728,29 @@ export default function ServerSettings({ serverId, server }: { serverId: string,
             <SubUsersManager serverId={serverId} embedded={true} />
 
             {/* DANGER ZONE - DELETE SERVER */}
-            {(user?.role === "admin" || user?.role === "owner" || server.owner === user?.id) && (
-              <div className="bg-red-950/20 backdrop-blur-xl border border-red-500/30 p-6 md:p-8 rounded-3xl shadow-[0_0_40px_-15px_rgba(239,68,68,0.2)] ring-1 ring-red-500/20 relative z-10">
-                <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
-                  <div>
-                    <h3 className="text-red-400 font-bold mb-1 flex items-center gap-2">
-                      <Trash2 className="w-5 h-5 text-red-500" /> Danger Zone: Delete Server
+            <div className="bg-red-950/20 backdrop-blur-xl border border-red-500/30 p-6 md:p-8 rounded-3xl shadow-[0_0_40px_-15px_rgba(239,68,68,0.2)] ring-1 ring-red-500/20 relative z-10">
+              <div className="flex items-start justify-between gap-4 flex-col sm:flex-row">
+                <div>
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="text-red-400 font-bold flex items-center gap-2">
+                      <ShieldAlert className="w-5 h-5 text-red-500" /> Danger Zone: Destructive Removal
                     </h3>
-                    <p className="text-muted-foreground text-sm max-w-xl">
-                      Permanently terminate and delete this server instance. All world saves, files, and configurations will be removed immediately.
-                    </p>
+                    <span className="px-2 py-0.5 rounded-md bg-red-500/15 border border-red-500/30 text-red-400 font-mono text-[10px] font-bold uppercase tracking-wider">
+                      Owner / Admin Only
+                    </span>
                   </div>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center gap-2 shrink-0"
-                  >
-                    <Trash2 className="w-4 h-4" /> Delete Server
-                  </button>
+                  <p className="text-muted-foreground text-sm max-w-xl">
+                    Permanently destroy this game server instance. Mandatory Administrative Confirmation is enforced: only users with <strong className="text-foreground font-semibold">Owner</strong> or <strong className="text-foreground font-semibold">Admin</strong> roles can authorize final removal.
+                  </p>
                 </div>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-6 py-2.5 bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-lg shadow-red-600/20 active:scale-95 flex items-center gap-2 shrink-0 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" /> Administrative Removal
+                </button>
               </div>
-            )}
+            </div>
           </>
         ) : (
            <div className="text-muted-foreground text-sm p-4 bg-muted rounded-xl border border-border-subtle">

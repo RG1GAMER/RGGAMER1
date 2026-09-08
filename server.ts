@@ -114,29 +114,44 @@ app.get("/api/health", (req, res) => {
 import apiRoutes from "./src/server/routes/api.js";
 app.use("/api", apiRoutes);
 
+// 404 catch-all for unmatched API requests so they don't fall through to the SPA HTML
+app.all("/api/*", (req, res) => {
+  res.status(404).json({ error: "API route not found" });
+});
+
 import { initSFTPServer } from "./src/server/services/sftp.js";
 import { startPlayitHealthMonitor } from "./src/server/services/playitHealth.js";
 import { detectEnvironment } from "./src/server/services/environmentDetector.js";
 
 async function startServer() {
-  const isProduction = process.env.NODE_ENV === "production" || process.argv[1]?.includes('server.cjs');
+  const isCjsBundle = typeof __filename !== "undefined" && __filename.includes("server.cjs");
+  const distPath = path.join(process.cwd(), "dist");
+  const hasDistIndex = fs.existsSync(path.join(distPath, "index.html"));
+  const isProduction = process.env.NODE_ENV === "production" || isCjsBundle || (hasDistIndex && process.env.NODE_ENV !== "development");
 
   if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true, allowedHosts: ["gtk.qzz.io"] },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      res.sendFile(path.join(distPath, "index.html"), (err) => {
+        if (err) {
+          res.status(200).send("<!DOCTYPE html><html><head><title>JTG Panel</title></head><body><div id='root'></div><script type='module' src='/src/main.tsx'></script></body></html>");
+        }
+      });
     });
   }
 
+  httpServer.on("error", (err: any) => {
+    console.error("[HTTP Server Error]", err?.message || err);
+  });
+
   httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`JTG Panel running on port ${PORT}`);
+    console.log(`JTG Panel running on port ${PORT} [mode: ${isProduction ? "production" : "development"}]`);
   });
 
   // Non-blocking background service initialization

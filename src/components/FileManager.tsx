@@ -595,6 +595,11 @@ export default function FileManager({ serverId }: { serverId: string }) {
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-sm gap-2">
                   <Folder className="w-12 h-12 stroke-[1.5] text-zinc-600" />
                   <p>This directory is empty or no items match your filter.</p>
+                  {path === "/" && (
+                    <p className="text-xs text-zinc-400 max-w-sm text-center">
+                      Server configuration files, server.properties, and worlds are generated automatically when the server is started for the first time (Aternos Lifecycle).
+                    </p>
+                  )}
                 </div>
               )}
 

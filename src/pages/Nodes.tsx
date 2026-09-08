@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { Link } from "react-router-dom";
+import { useSettings } from "../context/SettingsContext";
 
 interface NodeStats {
   cpuUsage: number;
@@ -61,6 +62,20 @@ interface NodeData {
   history?: number[];
 }
 
+const THEME_HEX_MAP: Record<string, string> = {
+  red: "#ef4444",
+  blue: "#3b82f6",
+  orange: "#f97316",
+  white: "#f4f4f5",
+  black: "#a1a1aa",
+  green: "#10b981",
+  purple: "#a855f7",
+  cyan: "#06b6d4",
+  amber: "#f59e0b",
+  rose: "#f43f5e",
+  indigo: "#6366f1"
+};
+
 function formatUptime(seconds?: number): string {
   if (!seconds || seconds <= 0) return "Just started";
   const days = Math.floor(seconds / 86400);
@@ -71,7 +86,7 @@ function formatUptime(seconds?: number): string {
   return `${mins}m`;
 }
 
-// Interactive SVG Area Chart for live metric streaming
+// Interactive SVG Area Chart for live metric streaming with dynamic theme color
 function LiveSparkline({
   data,
   color = "#10b981",
@@ -116,23 +131,23 @@ function LiveSparkline({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-            <stop offset="90%" stopColor={color} stopOpacity="0.0" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+            <stop offset="90%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
         {/* Baseline grid */}
-        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
-        <line x1="0" y1={height - 1} x2={width} y2={height - 1} stroke="rgba(255,255,255,0.08)" />
+        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="currentColor" className="text-border-subtle" strokeDasharray="3 3" />
+        <line x1="0" y1={height - 1} x2={width} y2={height - 1} stroke="currentColor" className="text-border-subtle" />
         {/* Area fill */}
         <path d={areaPath} fill={`url(#${gradientId})`} />
         {/* Stroke curve */}
-        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
         {/* Latest point pulse */}
         {coordinates.length > 0 && (
           <circle
             cx={coordinates[coordinates.length - 1].x}
             cy={coordinates[coordinates.length - 1].y}
-            r="3"
+            r="3.5"
             fill={color}
             className="animate-pulse"
           />
@@ -143,6 +158,9 @@ function LiveSparkline({
 }
 
 export default function Nodes() {
+  const { theme } = useSettings();
+  const activeAccentColor = THEME_HEX_MAP[theme] || "#ef4444";
+
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [nodeStats, setNodeStats] = useState<Record<string, NodeStats>>({});
   const [historyMap, setHistoryMap] = useState<Record<string, number[]>>({});
@@ -258,21 +276,21 @@ export default function Nodes() {
   const totalServersCount = nodes.reduce((sum, n) => sum + (n.serversCount || 0), 0);
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* HEADER BAR */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-white/10">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-border">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-mono uppercase">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground font-mono uppercase">
               Nodes
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Beta Testing
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-theme-500/10 text-theme-400 border border-theme-500/20 flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-theme-400 animate-pulse" />
+              Daemon Cluster
             </span>
           </div>
-          <p className="mt-1 text-sm text-zinc-400">
-            Node system daemon management and hardware metrics.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Node system daemon management, cluster health, and live telemetry.
           </p>
         </div>
 
@@ -280,7 +298,7 @@ export default function Nodes() {
           <button
             onClick={handleManualRefresh}
             disabled={refreshing}
-            className="flex items-center gap-2 rounded-xl bg-zinc-900 border border-white/10 px-3.5 py-2.5 text-xs sm:text-sm font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all active:scale-95 shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95 shadow-sm"
             title="Refresh metrics"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin text-theme-400" : ""}`} />
@@ -288,7 +306,7 @@ export default function Nodes() {
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-theme-600 hover:bg-theme-500 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-theme-600/20 transition-all active:scale-95"
+            className="flex items-center gap-2 rounded-xl bg-theme-600 hover:bg-theme-500 btn-primary-action px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-lg shadow-theme-600/20 transition-all active:scale-95"
           >
             <Plus className="h-4 w-4" /> Add Node
           </button>
@@ -297,45 +315,45 @@ export default function Nodes() {
 
       {/* QUICK SYSTEM AGGREGATE SUMMARY */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-zinc-900/60 border border-white/10 rounded-xl p-4 flex items-center gap-3.5">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3.5 shadow-sm">
           <div className="p-2.5 rounded-lg bg-theme-500/10 border border-theme-500/20 text-theme-400">
             <Server className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Active Nodes</div>
-            <div className="text-xl font-bold font-mono text-white mt-0.5">{totalNodesCount}</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Active Nodes</div>
+            <div className="text-xl font-bold font-mono text-foreground mt-0.5">{totalNodesCount}</div>
           </div>
         </div>
 
-        <div className="bg-zinc-900/60 border border-white/10 rounded-xl p-4 flex items-center gap-3.5">
-          <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 rounded-lg bg-theme-500/10 border border-theme-500/20 text-theme-400">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Hosted Instances</div>
-            <div className="text-xl font-bold font-mono text-white mt-0.5">{totalServersCount}</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Hosted Instances</div>
+            <div className="text-xl font-bold font-mono text-foreground mt-0.5">{totalServersCount}</div>
           </div>
         </div>
 
-        <div className="bg-zinc-900/60 border border-white/10 rounded-xl p-4 flex items-center gap-3.5">
-          <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 rounded-lg bg-theme-500/10 border border-theme-500/20 text-theme-400">
             <Radio className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Cluster Status</div>
-            <div className="text-sm font-semibold font-mono text-emerald-400 mt-1 flex items-center gap-1.5">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Cluster Status</div>
+            <div className="text-sm font-semibold font-mono text-theme-400 mt-1 flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4" /> 100% Operational
             </div>
           </div>
         </div>
 
-        <div className="bg-zinc-900/60 border border-white/10 rounded-xl p-4 flex items-center gap-3.5">
-          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+        <div className="bg-card border border-border rounded-xl p-4 flex items-center gap-3.5 shadow-sm">
+          <div className="p-2.5 rounded-lg bg-theme-500/10 border border-theme-500/20 text-theme-400">
             <Zap className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">Telemetry Stream</div>
-            <div className="text-sm font-mono text-zinc-300 mt-1">3.5s Polling</div>
+            <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Telemetry Stream</div>
+            <div className="text-sm font-mono text-foreground mt-1">3.5s Polling</div>
           </div>
         </div>
       </div>
@@ -349,15 +367,15 @@ export default function Nodes() {
 
       {/* NODE CARDS / EXPANDED FLAT CARDS */}
       {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3 text-zinc-500 font-mono text-sm">
+        <div className="py-20 flex flex-col items-center justify-center gap-3 text-muted-foreground font-mono text-sm">
           <RefreshCw className="w-6 h-6 animate-spin text-theme-500" />
           <span>Retrieving node telemetry...</span>
         </div>
       ) : nodes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/10 rounded-2xl bg-zinc-950/40 p-8">
-          <ServerCrash className="h-12 w-12 text-zinc-600 mb-4" />
-          <h3 className="text-lg font-semibold text-white">No nodes configured</h3>
-          <p className="text-sm text-zinc-400 mt-1 max-w-sm">
+        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-2xl bg-card/40 p-8">
+          <ServerCrash className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground">No nodes configured</h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
             Connect your host daemon or a Pterodactyl Wings node to start orchestrating containers.
           </p>
         </div>
@@ -396,43 +414,43 @@ export default function Nodes() {
             return (
               <div
                 key={node.id}
-                className="rounded-2xl border border-white/10 bg-zinc-950/70 backdrop-blur-md p-5 sm:p-6 shadow-xl transition-all hover:border-white/20"
+                className="rounded-2xl border border-border bg-card/90 backdrop-blur-md p-5 sm:p-6 shadow-xl transition-all hover:border-theme-500/40"
               >
                 {/* NODE TOP BAR */}
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-white/5">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-5 border-b border-border">
                   <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="p-3 rounded-xl bg-zinc-900 border border-white/10 text-theme-400 shadow-inner">
+                    <div className="p-3 rounded-xl bg-muted border border-border text-theme-400 shadow-inner">
                       <Server className="h-6 w-6" />
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2.5">
-                        <h3 className="text-lg font-bold text-white font-mono">{node.name}</h3>
-                        <span className="flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <h3 className="text-lg font-bold text-foreground font-mono">{node.name}</h3>
+                        <span className="flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-theme-500/10 text-theme-400 border border-theme-500/25">
                           <CheckCircle2 className="w-3 h-3 mr-1" /> Online
                         </span>
                         {node.isLocal ? (
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-theme-500/15 text-theme-300 border border-theme-500/30">
                             Local Engine
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-theme-500/15 text-theme-300 border border-theme-500/30">
                             Wings Agent
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-zinc-400 font-mono">
+                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-muted-foreground font-mono">
                         <span className="flex items-center gap-1">
-                          <Globe className="w-3.5 h-3.5 text-zinc-500" />
+                          <Globe className="w-3.5 h-3.5 text-muted-foreground/70" />
                           {nodeEndpoint}
                         </span>
                         <button
                           onClick={() => copyToClipboard(nodeEndpoint, node.id)}
-                          className="hover:text-white flex items-center gap-1 text-zinc-400 hover:underline transition-all"
+                          className="hover:text-foreground flex items-center gap-1 text-muted-foreground hover:underline transition-all"
                         >
                           {copiedId === node.id ? (
                             <>
-                              <Check className="w-3 h-3 text-emerald-400" />
-                              <span className="text-emerald-400">Copied</span>
+                              <Check className="w-3 h-3 text-theme-400" />
+                              <span className="text-theme-400 font-semibold">Copied</span>
                             </>
                           ) : (
                             <>
@@ -441,7 +459,7 @@ export default function Nodes() {
                             </>
                           )}
                         </button>
-                        <span className="flex items-center gap-1 text-zinc-500">
+                        <span className="flex items-center gap-1 text-muted-foreground">
                           <Clock className="w-3.5 h-3.5" />
                           Uptime: {formatUptime(stats?.uptime || node.uptime)}
                         </span>
@@ -453,7 +471,7 @@ export default function Nodes() {
                   <div className="flex items-center gap-3 self-end lg:self-center">
                     <Link
                       to="/servers"
-                      className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-xs font-mono text-zinc-300 hover:text-white transition-all flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-xl bg-muted hover:bg-muted/80 border border-border text-xs font-mono text-foreground transition-all flex items-center gap-1.5 shadow-sm"
                     >
                       <Layers className="w-3.5 h-3.5 text-theme-400" />
                       <span>{node.serversCount || 0} Servers</span>
@@ -475,27 +493,33 @@ export default function Nodes() {
                 {/* REAL-TIME USAGE METRICS (FLAT & EXPANSIVE GRAPH SECTION) */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-5">
                   {/* 1. CPU USAGE & LIVE SPARKLINE */}
-                  <div className="rounded-xl border border-white/5 bg-zinc-900/50 p-4 flex flex-col justify-between">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
+                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
                           <Cpu className="w-4 h-4 text-theme-400" />
                           <span>CPU Load</span>
                         </div>
-                        <span className="text-xs font-mono text-zinc-400">{cpuCores} Threads</span>
+                        <span className="text-xs font-mono text-muted-foreground">{cpuCores} Threads</span>
                       </div>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-2xl font-black font-mono text-white tracking-tight">
+                        <span className={`text-2xl font-black font-mono tracking-tight ${
+                          currentCpu > 75 
+                            ? 'text-red-500' 
+                            : currentCpu >= 40 
+                            ? 'text-amber-400' 
+                            : 'text-emerald-400'
+                        }`}>
                           {currentCpu}%
                         </span>
-                        <span className="text-xs font-mono text-emerald-400">Live Rate</span>
+                        <span className="text-xs font-mono text-muted-foreground">Live Rate</span>
                       </div>
                     </div>
 
                     <div className="mt-3">
                       <LiveSparkline
                         data={history}
-                        color="#ef4444"
+                        color={currentCpu > 75 ? "#ef4444" : currentCpu >= 40 ? "#f59e0b" : "#10b981"}
                         gradientId={`cpu-grad-${node.id}`}
                         height={50}
                         label="CPU"
@@ -504,35 +528,47 @@ export default function Nodes() {
                   </div>
 
                   {/* 2. RAM ALLOCATION & PERCENTAGE GAUGE */}
-                  <div className="rounded-xl border border-white/5 bg-zinc-900/50 p-4 flex flex-col justify-between">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
-                          <Activity className="w-4 h-4 text-blue-400" />
+                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                          <Activity className="w-4 h-4 text-theme-400" />
                           <span>RAM Allocation</span>
                         </div>
-                        <span className="text-xs font-mono text-zinc-400">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {usedRamGB} / {totalRamGB} GB
                         </span>
                       </div>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-2xl font-black font-mono text-white tracking-tight">
+                        <span className={`text-2xl font-black font-mono tracking-tight ${
+                          ramPercent > 80 
+                            ? 'text-red-500' 
+                            : ramPercent >= 50 
+                            ? 'text-amber-400' 
+                            : 'text-emerald-400'
+                        }`}>
                           {ramPercent}%
                         </span>
-                        <span className="text-xs font-mono text-zinc-400">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {(totalRamMB - usedRamMB) > 0 ? `${((totalRamMB - usedRamMB) / 1024).toFixed(1)} GB free` : "Max capacity"}
                         </span>
                       </div>
                     </div>
 
                     <div className="mt-4 space-y-1.5">
-                      <div className="w-full bg-zinc-800/80 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="w-full bg-muted h-2.5 rounded-full overflow-hidden p-0.5 border border-border">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500"
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            ramPercent > 80 
+                              ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' 
+                              : ramPercent >= 50 
+                              ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' 
+                              : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                          }`}
                           style={{ width: `${Math.min(100, Math.max(2, ramPercent))}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] font-mono text-zinc-500">
+                      <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
                         <span>0 GB</span>
                         <span>{totalRamGB} GB Pool</span>
                       </div>
@@ -540,35 +576,35 @@ export default function Nodes() {
                   </div>
 
                   {/* 3. DISK STORAGE & PERCENTAGE GAUGE */}
-                  <div className="rounded-xl border border-white/5 bg-zinc-900/50 p-4 flex flex-col justify-between">
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-zinc-400">
-                          <HardDrive className="w-4 h-4 text-emerald-400" />
+                        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                          <HardDrive className="w-4 h-4 text-theme-400" />
                           <span>Disk Capacity</span>
                         </div>
-                        <span className="text-xs font-mono text-zinc-400">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {usedDiskGB} / {totalDiskGB} GB
                         </span>
                       </div>
                       <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-2xl font-black font-mono text-white tracking-tight">
+                        <span className="text-2xl font-black font-mono text-foreground tracking-tight">
                           {diskPercent}%
                         </span>
-                        <span className="text-xs font-mono text-zinc-400">
+                        <span className="text-xs font-mono text-muted-foreground">
                           {(totalDiskMB - usedDiskMB) > 0 ? `${((totalDiskMB - usedDiskMB) / 1024).toFixed(1)} GB available` : "Full"}
                         </span>
                       </div>
                     </div>
 
                     <div className="mt-4 space-y-1.5">
-                      <div className="w-full bg-zinc-800/80 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/5">
+                      <div className="w-full bg-muted h-2.5 rounded-full overflow-hidden p-0.5 border border-border">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
+                          className="h-full rounded-full bg-theme-500 shadow-sm shadow-theme-500/20 transition-all duration-500"
                           style={{ width: `${Math.min(100, Math.max(2, diskPercent))}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-[10px] font-mono text-zinc-500">
+                      <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
                         <span>0 GB</span>
                         <span>{totalDiskGB} GB Space</span>
                       </div>
@@ -584,15 +620,15 @@ export default function Nodes() {
       {/* ADD WINGS NODE MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-border pb-4">
               <div className="flex items-center gap-2">
                 <Server className="w-5 h-5 text-theme-400" />
-                <h2 className="text-lg font-bold font-mono text-white">Add Wings Node</h2>
+                <h2 className="text-lg font-bold font-mono text-foreground">Add Wings Node</h2>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -600,36 +636,36 @@ export default function Nodes() {
 
             <form onSubmit={handleAddNode} className="space-y-4">
               <div>
-                <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Node Identifier Name</label>
+                <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Node Identifier Name</label>
                 <input
                   required
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                  className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                   placeholder="e.g. EU-Frankfurt-Node01"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Hostname / FQDN</label>
+                  <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Hostname / FQDN</label>
                   <input
                     required
                     type="text"
                     value={formData.hostname}
                     onChange={(e) => setFormData({ ...formData, hostname: e.target.value })}
-                    className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                    className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                     placeholder="node1.domain.com"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Daemon API Port</label>
+                  <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Daemon API Port</label>
                   <input
                     type="number"
                     value={formData.apiPort}
                     onChange={(e) => setFormData({ ...formData, apiPort: parseInt(e.target.value) || 8080 })}
-                    className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                    className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                     placeholder="8080"
                   />
                 </div>
@@ -637,21 +673,21 @@ export default function Nodes() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Total Memory (MB)</label>
+                  <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Total Memory (MB)</label>
                   <input
                     type="number"
                     value={formData.memory}
                     onChange={(e) => setFormData({ ...formData, memory: parseInt(e.target.value) || 8192 })}
-                    className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                    className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Total Disk (MB)</label>
+                  <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Total Disk (MB)</label>
                   <input
                     type="number"
                     value={formData.disk}
                     onChange={(e) => setFormData({ ...formData, disk: parseInt(e.target.value) || 50000 })}
-                    className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                    className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                   />
                 </div>
               </div>
@@ -662,20 +698,20 @@ export default function Nodes() {
                     type="checkbox"
                     checked={formData.ssl}
                     onChange={(e) => setFormData({ ...formData, ssl: e.target.checked })}
-                    className="text-theme-600 rounded border-white/10 bg-black/60"
+                    className="text-theme-600 rounded border-border bg-muted/50"
                   />
-                  <span className="text-xs font-medium text-zinc-300">Enable SSL / TLS for daemon communication</span>
+                  <span className="text-xs font-medium text-foreground">Enable SSL / TLS for daemon communication</span>
                 </label>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-mono uppercase text-zinc-400">Wings Bearer Token</label>
+                <label className="mb-1 block text-xs font-mono uppercase text-muted-foreground">Wings Bearer Token</label>
                 <input
                   required
                   type="password"
                   value={formData.token}
                   onChange={(e) => setFormData({ ...formData, token: e.target.value })}
-                  className="w-full rounded-xl border border-white/10 bg-black/60 p-3 text-sm text-white focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono"
+                  className="w-full rounded-xl border border-border bg-muted/50 p-3 text-sm text-foreground focus:border-theme-500 focus:outline-none focus:ring-1 focus:ring-theme-500 font-mono shadow-inner"
                   placeholder="Daemon bearer authorization token"
                 />
               </div>
@@ -684,13 +720,13 @@ export default function Nodes() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl border border-white/10 text-xs font-mono text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                  className="px-4 py-2.5 rounded-xl border border-border text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-theme-600 hover:bg-theme-500 text-xs font-semibold text-white shadow-lg shadow-theme-600/25 transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-theme-600 hover:bg-theme-500 btn-primary-action text-xs font-semibold text-white shadow-lg shadow-theme-600/25 transition-all"
                 >
                   Deploy Node
                 </button>

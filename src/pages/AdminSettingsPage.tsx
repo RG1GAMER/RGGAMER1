@@ -410,7 +410,7 @@ export default function AdminSettingsPage(): React.ReactElement {
               onChange={(e: any) => setFbEnableGoogleLogin(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-600"></div>
+            <div className="w-11 h-6 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_12px_rgba(220,38,38,0.5)]"></div>
           </label>
         </div>
       </div>
@@ -573,7 +573,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                return (
                    <button
                        key={tab.id}
-                       onClick={() => handleTabChange(tab.id)}
+                       onClick={() => { handleTabChange(tab.id); setMobileOpen(false); }}
                        className={`relative flex w-full items-center px-3 py-3 rounded transition-colors group overflow-hidden`}
                    >
                        {isActive && (
@@ -597,12 +597,35 @@ export default function AdminSettingsPage(): React.ReactElement {
                );
            })}
     
-           <div className="mt-8 pt-4 border-t border-line/40">
-              <Link to="/" className="relative flex items-center px-3 py-3 rounded transition-colors group overflow-hidden">
-                 <div className="relative z-10 text-dim group-hover:text-white transition-colors duration-200">
-                     <ArrowLeft size={20} />
-                 </div>
-                 <span className="ml-3 font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">BACK TO APP</span>
+           <div className="mt-6 pt-4 border-t border-line/40 space-y-1">
+              <p className="px-3 mb-2 font-mono text-[10px] text-faint tracking-widest uppercase">Quick Navigation</p>
+              <Link 
+                to="/" 
+                onClick={() => setMobileOpen(false)}
+                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
+              >
+                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">OVERVIEW</span>
+              </Link>
+              <Link 
+                to="/servers" 
+                onClick={() => setMobileOpen(false)}
+                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
+              >
+                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">SERVERS</span>
+              </Link>
+              <Link 
+                to="/servers/create" 
+                onClick={() => setMobileOpen(false)}
+                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
+              >
+                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">DEPLOY SERVER</span>
+              </Link>
+              <Link 
+                to="/admin/servers" 
+                onClick={() => setMobileOpen(false)}
+                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
+              >
+                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">FLEET MANAGEMENT</span>
               </Link>
            </div>
          </nav>
@@ -610,12 +633,14 @@ export default function AdminSettingsPage(): React.ReactElement {
     
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-transparent">
-         <header className="sticky top-0 z-40 border-b border-line bg-ink backdrop-blur-md flex-shrink-0 h-16 flex items-center px-4 md:px-8">
+         <header className="sticky top-0 z-40 border-b border-line bg-ink backdrop-blur-md flex-shrink-0 h-16 flex items-center px-3 sm:px-6">
             <button 
-                onClick={() => setMobileOpen(true)}
-                className="md:hidden p-2 -ml-2 mr-3 text-dim hover:text-white hover:bg-line/50 rounded-lg transition-colors flex items-center justify-center"
+                onClick={() => setMobileOpen(prev => !prev)}
+                className="md:hidden p-2.5 mr-3 bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border border-theme-500/30 text-theme-300 hover:text-white rounded-xl transition-all flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
+                title="Open All Options Menu"
+                aria-label="Open Navigation Menu"
             >
-                <Menu className="w-5 h-5" />
+                <Menu className="w-5 h-5 text-theme-400" />
             </button>
             <h1 className="font-display font-bold text-xl uppercase text-white tracking-wide">
                {adminTabs.find(t => t.id === activeTab)?.label}
@@ -1247,7 +1272,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 }}
                                 className="sr-only peer"
                               />
-                              <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-600"></div>
+                              <div className="w-11 h-6 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_12px_rgba(220,38,38,0.5)]"></div>
                             </label>
                           </div>
 
@@ -1270,7 +1295,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 }}
                                 className="sr-only peer"
                               />
-                              <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-600"></div>
+                              <div className="w-11 h-6 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_12px_rgba(220,38,38,0.5)]"></div>
                             </label>
                           </div>
 
@@ -1293,7 +1318,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 }}
                                 className="sr-only peer"
                               />
-                              <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-600"></div>
+                              <div className="w-11 h-6 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_12px_rgba(220,38,38,0.5)]"></div>
                             </label>
                           </div>
 
@@ -1316,7 +1341,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                                 }}
                                 className="sr-only peer"
                               />
-                              <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-theme-600"></div>
+                              <div className="w-11 h-6 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_12px_rgba(220,38,38,0.5)]"></div>
                             </label>
                           </div>
                         </div>
@@ -1445,7 +1470,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                                   onChange={(e) => setNewAllowOnlineRecovery(e.target.checked)}
                                   className="sr-only peer"
                                 />
-                                <div className="w-9 h-5 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-theme-600"></div>
+                                <div className="w-9 h-5 bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600 peer-checked:shadow-[0_0_10px_rgba(220,38,38,0.5)]"></div>
                               </label>
                             </div>
                           </div>

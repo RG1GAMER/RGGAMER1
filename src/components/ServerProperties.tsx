@@ -160,7 +160,9 @@ export default function ServerProperties({ serverId }: { serverId: string }) {
                   <button
                     onClick={() => handleChange(prop.key, properties[prop.key] === 'true' ? 'false' : 'true')}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                        properties[prop.key] === 'true' ? 'bg-theme-600' : 'bg-zinc-700'
+                        properties[prop.key] === 'true' 
+                          ? 'bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)]' 
+                          : 'bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]'
                     }`}
                   >
                     <span

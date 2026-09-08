@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import { readJSON, writeJSON } from "../services/db.js";
 import {
   createServerRuntime,
@@ -316,65 +317,16 @@ export const createServer = async (req: Request, res: Response) => {
     servers.push(serverData);
     await writeJSON("servers.json", servers);
 
-    // Pre-seed files for Node.js and Python applications
+    // Initialize clean server directory
+    // In accordance with Aternos architecture:
+    // When a new server is created, the directory and file manager start completely empty.
+    // All files (server.properties, eula.txt, world/ folder, configs, plugins) are generated when the server is started for the first time.
     try {
       const serverDir = path.join(process.cwd(), ".data", "servers", id);
       await fs.ensureDir(serverDir);
-      const upperType = (type || "PAPER").toUpperCase();
-      if (upperType === "NODEJS" || upperType === "NODE") {
-        const indexPath = path.join(serverDir, "index.js");
-        const pkgPath = path.join(serverDir, "package.json");
-        if (!fs.existsSync(indexPath)) {
-          await fs.writeFile(indexPath, `// Node.js Application on JTG Panel\nconst http = require('http');\nconst port = process.env.PORT || process.env.SERVER_PORT || ${numericPort};\n\nconsole.log('==============================================');\nconsole.log('🚀 Node.js Application Running on port ' + port);\nconsole.log('Node Version: ' + process.version);\nconsole.log('Upload your files in File Manager to customize!');\nconsole.log('==============================================');\n\nconst server = http.createServer((req, res) => {\n  res.writeHead(200, { 'Content-Type': 'application/json' });\n  res.end(JSON.stringify({\n    status: 'online',\n    runtime: 'node.js',\n    time: new Date().toISOString()\n  }));\n});\n\nserver.listen(port, '0.0.0.0', () => {\n  console.log(\`[Server] Listening on http://0.0.0.0:\${port}\`);\n});\n`);
-        }
-        if (!fs.existsSync(pkgPath)) {
-          await fs.writeFile(pkgPath, JSON.stringify({
-            name: name.toLowerCase().replace(/[^a-z0-9_-]/g, '-') || "node-app",
-            version: "1.0.0",
-            description: "Node.js application hosted on JTG Panel",
-            main: "index.js",
-            scripts: {
-              "start": "node index.js"
-            },
-            dependencies: {}
-          }, null, 2));
-        }
-      } else if (upperType === "PYTHON" || upperType === "PYTHON3") {
-        const mainPath = path.join(serverDir, "main.py");
-        const reqPath = path.join(serverDir, "requirements.txt");
-        if (!fs.existsSync(mainPath)) {
-          await fs.writeFile(mainPath, `# Python Application on JTG Panel\nimport os\nimport sys\nfrom http.server import HTTPServer, BaseHTTPRequestHandler\n\nport = int(os.environ.get("SERVER_PORT", os.environ.get("PORT", ${numericPort})))\n\nprint("==============================================", flush=True)\nprint("🐍 Python Application Running", flush=True)\nprint(f"Python Version: {sys.version}", flush=True)\nprint(f"Listening Port: {port}", flush=True)\nprint("Upload your files in File Manager to customize!", flush=True)\nprint("==============================================", flush=True)\n\nclass RequestHandler(BaseHTTPRequestHandler):\n    def do_GET(self):\n        self.send_response(200)\n        self.send_header('Content-type', 'application/json')\n        self.end_headers()\n        self.wfile.write(b'{"status": "online", "runtime": "python"}')\n\n    def log_message(self, format, *args):\n        print(f"[{self.log_date_time_string()}] {format % args}", flush=True)\n\nserver = HTTPServer(('0.0.0.0', port), RequestHandler)\nprint(f"[Server] Listening on http://0.0.0.0:{port}", flush=True)\n\ntry:\n    server.serve_forever()\nexcept KeyboardInterrupt:\n    print("\\nStopping server...", flush=True)\n    server.server_close()\n`);
-        }
-        if (!fs.existsSync(reqPath)) {
-          await fs.writeFile(reqPath, "# Add python dependencies here\n");
-        }
-      } else {
-        // Minecraft / Proxy servers
-        const isProxy = ["VELOCITY", "BUNGEECORD", "WATERFALL"].includes(upperType);
-        if (!isProxy) {
-          await ensureAternosStandardServerFiles(serverDir, { port: numericPort, name, levelName: "world" });
-        } else {
-          const eulaPath = path.join(serverDir, "eula.txt");
-          if (!fs.existsSync(eulaPath)) {
-            await fs.writeFile(eulaPath, "eula=true\n");
-          }
-          const propsPath = path.join(serverDir, "server.properties");
-          if (!fs.existsSync(propsPath)) {
-            await fs.writeFile(propsPath, `server-port=${numericPort}\nmotd=${name || "A Minecraft Server"}\n`);
-          }
-          await fs.ensureDir(path.join(serverDir, "plugins"));
-        }
-        const jarPath = path.join(serverDir, "server.jar");
-        if (!fs.existsSync(jarPath)) {
-          console.log(`[createServer] Initiating JAR download for ${type || "PAPER"} (${version || "latest"})...`);
-          downloadJar(type || "PAPER", version || "latest", jarPath).catch(err => {
-            console.warn("[createServer] Initial JAR download notice:", err?.message || err);
-          });
-        }
-        await secureDirectoryPermissions(serverDir);
-      }
+      await secureDirectoryPermissions(serverDir);
     } catch (seedErr) {
-      console.warn("Failed to pre-seed starter files:", seedErr);
+      console.warn("Failed to initialize server directory:", seedErr);
     }
 
     try {
@@ -447,6 +399,17 @@ export const deleteServer = async (req: Request, res: Response) => {
     const { id } = req.params;
     const user = (req as any).user;
     
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Role check: Only admin or owner can delete servers
+    if (user.role !== "admin" && user.role !== "owner") {
+      return res.status(403).json({ 
+        error: "Administrative Authorization Required: Only users with 'owner' or 'admin' roles can authorize the destructive removal of game servers." 
+      });
+    }
+
     let servers = await readJSON("servers.json") || [];
     const server = servers.find((s: any) => s.id === id);
     
@@ -454,9 +417,33 @@ export const deleteServer = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Server not found" });
     }
 
-    if (user.role !== "admin" && user.role !== "owner") {
-      return res.status(403).json({ error: "Only admins can delete servers" });
+    const { confirmationPhrase, adminPassword } = req.body || {};
+
+    // Validate confirmation phrase if provided
+    if (confirmationPhrase) {
+      const cleanPhrase = String(confirmationPhrase).trim();
+      const expected1 = server.name.trim();
+      const expected2 = `DELETE ${server.name.trim()}`;
+      if (cleanPhrase !== expected1 && cleanPhrase !== expected2 && cleanPhrase !== server.id) {
+        return res.status(400).json({ 
+          error: `Administrative confirmation mismatch. Expected '${server.name}', received '${cleanPhrase}'.` 
+        });
+      }
     }
+
+    // Validate administrator password if provided
+    if (adminPassword) {
+      const users = await readJSON("users.json") || [];
+      const dbUser = users.find((u: any) => u.id === user.id);
+      if (dbUser && dbUser.password) {
+        const isMatch = await bcrypt.compare(adminPassword, dbUser.password);
+        if (!isMatch) {
+          return res.status(401).json({ error: "Administrative authorization failed: Invalid administrator password." });
+        }
+      }
+    }
+
+    console.log(`[ADMIN DESTRUCTIVE ACTION] Server '${server.name}' (${server.id}) permanently deleted by authorized ${user.role} '${user.username}' at ${new Date().toISOString()}`);
 
     if (server.containerId) {
       await deleteServerRuntime(server);
@@ -475,7 +462,7 @@ export const deleteServer = async (req: Request, res: Response) => {
     
     await deleteSftpUser(id).catch(e => console.error("SFTP user deletion failed:", e));
     
-    res.json({ success: true });
+    res.json({ success: true, message: `Server '${server.name}' permanently deleted under administrative authorization.` });
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -606,6 +593,8 @@ export const startServer = async (req: Request, res: Response) => {
       await startServerRuntime(server);
       server.status = "online";
       server.startedAt = new Date().toISOString();
+      server.hasStartedOnce = true;
+      server.firstStartDone = true;
       await writeJSON("servers.json", servers);
     } catch (startErr: any) {
       if (startErr.statusCode === 404 || (startErr.message && startErr.message.toLowerCase().includes("no such container"))) {
@@ -614,6 +603,8 @@ export const startServer = async (req: Request, res: Response) => {
         await startServerRuntime(server);
         server.status = "online";
         server.startedAt = new Date().toISOString();
+        server.hasStartedOnce = true;
+        server.firstStartDone = true;
         await writeJSON("servers.json", servers);
       } else {
         throw startErr;
@@ -931,8 +922,9 @@ export const getFiles = async (req: Request, res: Response) => {
        return res.json({ isFile: true, content });
     }
     const files = await fs.readdir(targetPath, { withFileTypes: true });
+    const visibleFiles = files.filter(f => f.name !== ".server_metadata.json" && f.name !== ".initialized");
     const items = await Promise.all(
-      files.map(async (f) => {
+      visibleFiles.map(async (f) => {
         let size = 0;
         try {
           if (!f.isDirectory()) {

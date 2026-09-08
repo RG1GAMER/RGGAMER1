@@ -32,6 +32,7 @@ import {
   Layers,
   ArrowUpDown,
   RotateCcw,
+  Download,
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,6 +44,12 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
   const [claimLink, setClaimLink] = useState<string | null>(null);
   const [publicAddress, setPublicAddress] = useState<string | null>(null);
   const [logs, setLogs] = useState<string>("");
+
+  // Playit Official Plugin State
+  const [isPluginInstalled, setIsPluginInstalled] = useState(false);
+  const [pluginFileName, setPluginFileName] = useState<string | null>(null);
+  const [isInstallingPlugin, setIsInstallingPlugin] = useState(false);
+  const [pluginNotice, setPluginNotice] = useState<string | null>(null);
   const [healthData, setHealthData] = useState<any>(null);
   const [diagnostics, setDiagnostics] = useState<PlayitDiagnostics | null>(null);
   const [playerCount, setPlayerCount] = useState<number>(0);
@@ -89,11 +96,38 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
 
   useEffect(() => {
     fetchStatus();
+    checkPluginStatus();
     // Fast polling (2s) when claimLink is present or tunnel is starting, standard polling (5s) otherwise
     const pollInterval = (claimLink || (status === "running" && !publicAddress)) ? 2000 : 5000;
     const interval = setInterval(fetchStatus, pollInterval);
     return () => clearInterval(interval);
   }, [serverId, claimLink, status, publicAddress]);
+
+  const checkPluginStatus = async () => {
+    try {
+      const res = await axios.get(`/api/servers/${serverId}/playit/plugin-status`);
+      setIsPluginInstalled(!!res.data.installed);
+      setPluginFileName(res.data.fileName || null);
+    } catch {
+      setIsPluginInstalled(false);
+    }
+  };
+
+  const handleInstallPlugin = async () => {
+    setIsInstallingPlugin(true);
+    setPluginNotice(null);
+    try {
+      const res = await axios.post(`/api/servers/${serverId}/playit/install-plugin`);
+      setIsPluginInstalled(true);
+      setPluginFileName(res.data.fileName || "playit-minecraft-plugin.jar");
+      setPluginNotice("Official Playit.gg plugin installed directly into plugins/ folder!");
+      setTimeout(() => setPluginNotice(null), 5000);
+    } catch (err: any) {
+      setPluginNotice("Failed to install plugin: " + (err.response?.data?.error || err.message));
+    } finally {
+      setIsInstallingPlugin(false);
+    }
+  };
 
   // Trigger celebration banner when claim transitions to live public address
   useEffect(() => {
@@ -228,6 +262,22 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
     try {
       await axios.post(`/api/servers/${serverId}/playit/reset`);
       setStatus("running");
+
+      // Poll for new claim link and automatically open in a new tab
+      let tries = 0;
+      const pollTimer = setInterval(async () => {
+        tries++;
+        try {
+          const res = await axios.get(`/api/servers/${serverId}/playit`);
+          if (res.data.claimLink) {
+            setClaimLink(res.data.claimLink);
+            window.open(res.data.claimLink, "_blank");
+            clearInterval(pollTimer);
+          }
+        } catch {}
+        if (tries > 15) clearInterval(pollTimer);
+      }, 1500);
+
       await fetchStatus();
     } catch (e: any) {
       console.error("Failed to create new tunnel", e);
@@ -667,7 +717,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
         )}
 
         {/* Diagnostics & Status Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Local Minecraft & TCP Reachability */}
           <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
@@ -809,6 +859,58 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
               </div>
             </div>
           </div>
+
+          {/* Card 4: Official Playit Plugin Status */}
+          <div className="bg-card border border-border-subtle rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Download className="w-4 h-4 text-theme-500" /> Playit Plugin
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                isPluginInstalled
+                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+              }`}>
+                {isPluginInstalled ? "Installed" : "Not Installed"}
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <div className="text-xs flex items-center justify-between">
+                <span className="text-muted-foreground">Location:</span>
+                <span className="font-mono text-foreground font-semibold text-[11px] truncate max-w-[130px]">
+                  {pluginFileName ? `plugins/${pluginFileName}` : "plugins/ folder"}
+                </span>
+              </div>
+
+              <div className="text-xs flex items-center justify-between">
+                <span className="text-muted-foreground">Version:</span>
+                <span className="text-foreground font-semibold text-[11px]">v0.2.0 Official</span>
+              </div>
+
+              <div className="pt-1 border-t border-border-subtle/60 flex items-center justify-between gap-2">
+                <button
+                  onClick={handleInstallPlugin}
+                  disabled={isInstallingPlugin || isProcessing}
+                  className="w-full py-1.5 px-2.5 bg-theme-500/15 hover:bg-theme-500/25 text-theme-400 border border-theme-500/30 font-semibold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+                  title="Official Playit.gg plugin directly plugins/ folder me download karein"
+                >
+                  {isInstallingPlugin ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isPluginInstalled ? "Reinstall / Update" : "Install Official Plugin"}</span>
+                </button>
+              </div>
+            </div>
+
+            {pluginNotice && (
+              <p className="text-[10px] text-emerald-400 leading-tight">
+                {pluginNotice}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Main Controls Card */}
@@ -930,7 +1032,7 @@ export default function PlayitTunnel({ serverId }: { serverId: string }) {
 
           <div className="p-4">
             {activeTab === "terminal" ? (
-              <div className="h-[360px] bg-background rounded-xl p-4 font-mono text-[12px] leading-relaxed text-zinc-300 overflow-y-auto whitespace-pre-wrap border border-border-subtle selection:bg-theme-600 selection:text-white">
+              <div className="h-[360px] bg-background rounded-xl p-4 font-mono text-[12px] leading-relaxed text-foreground-muted overflow-y-auto whitespace-pre-wrap border border-border-subtle selection:bg-theme-600 selection:text-white">
                 {logs || (
                   <div className="flex items-center justify-center h-full text-muted-foreground italic">
                     Playit agent is idle. Click 'Start Tunnel' or 'New Tunnel' to initialize.

@@ -465,7 +465,9 @@ export const startContainer = async (containerId: string, nodeId?: string) => {
         } else {
           const propsPath = path.join(serverDir, "server.properties");
           if (!fs.existsSync(propsPath)) {
-            await fs.writeFile(propsPath, "server-port=" + server.port + "\nmotd=A Minecraft Server\n");
+            const { ensureAternosStandardServerFiles } = await import("../controllers/world.js");
+            await ensureAternosStandardServerFiles(serverDir, server);
+            panelEvents.emit("log", id, `[Aternos Lifecycle] First-time startup: Server configuration, EULA, and world dimensions generated.\r\n`);
           }
         }
       }

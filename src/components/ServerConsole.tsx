@@ -12,10 +12,12 @@ import {
   ChevronDown,
   ArrowDownToLine,
   AlertTriangle,
-  Info
+  Info,
+  Palette
 } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "../context/AuthContext";
+import { useSettings } from "../context/SettingsContext";
 import axios from "axios";
 import { ServerResourceStats, formatBytesToDisplay } from "../types/stats";
 
@@ -175,6 +177,20 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
   const sockRef = useRef<Socket | null>(null);
   const connectedOnceRef = useRef(false);
   const { token } = useAuth();
+  const { theme, setTheme, uiTheme } = useSettings();
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+
+  const THEME_COLOR_PRESETS = [
+    { id: "cyan", name: "Cyber Cyan", color: "#06b6d4" },
+    { id: "green", name: "Emerald Green", color: "#10b981" },
+    { id: "purple", name: "Electric Purple", color: "#8b5cf6" },
+    { id: "blue", name: "Cobalt Blue", color: "#3b82f6" },
+    { id: "red", name: "Crimson Red", color: "#ef4444" },
+    { id: "amber", name: "Amber Gold", color: "#f59e0b" },
+    { id: "orange", name: "Sunset Orange", color: "#f97316" },
+    { id: "rose", name: "Vivid Rose", color: "#f43f5e" },
+    { id: "indigo", name: "Deep Indigo", color: "#6366f1" },
+  ];
 
   // Synchronize server prop updates
   useEffect(() => {
@@ -535,13 +551,18 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
 
   return (
     <div className="w-full h-full flex flex-col p-2 sm:p-4 min-h-[550px] font-sans">
-      <div className="flex-1 flex flex-col qx-glass rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative">
+      <div 
+        className="flex-1 flex flex-col rounded-2xl border border-theme-500/30 shadow-2xl overflow-hidden relative transition-all duration-300 bg-card/90 backdrop-blur-xl"
+        style={{
+          boxShadow: '0 0 35px -5px color-mix(in srgb, var(--theme-500) 25%, transparent), 0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+        }}
+      >
         
         {/* CONSOLE HEADER WITH LIVE UPTIME AND START TIME */}
-        <div className="px-3.5 sm:px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/40 backdrop-blur-md">
+        <div className="px-3.5 sm:px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-theme-500/20 bg-gradient-to-r from-theme-500/10 via-card/95 to-theme-500/5 backdrop-blur-xl transition-colors duration-300">
           {/* Left: Terminal Identity, Start Timestamp and Live Uptime */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-theme-500/30 bg-theme-500/10 flex items-center justify-center text-theme-400 shrink-0 shadow-sm shadow-theme-500/20">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-theme-500/40 bg-theme-500/15 flex items-center justify-center text-theme-400 shrink-0 shadow-sm shadow-theme-500/25">
               <XTerm className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div className="flex flex-col min-w-0">
@@ -598,8 +619,66 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
             </div>
           </div>
 
-          {/* Right: Clean Terminal Status, Auto-scroll Toggle & Clear Buffer */}
-          <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Right: Theme Color Sync Indicator/Switcher, Auto-scroll Toggle & Clear Buffer */}
+          <div className="flex items-center gap-2 ml-auto shrink-0 relative">
+            
+            {/* Live Terminal UI Theme Color Sync Button & Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setThemeMenuOpen(prev => !prev)}
+                title={`Terminal UI Color synced with ${theme.toUpperCase()} theme. Click to change color.`}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-xs transition-all select-none active:scale-95 bg-theme-500/10 hover:bg-theme-500/20 border-theme-500/35 text-theme-300 shadow-sm shadow-theme-500/10 cursor-pointer"
+              >
+                <span 
+                  className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm transition-all"
+                  style={{ backgroundColor: 'var(--theme-500)' }}
+                />
+                <span className="hidden md:inline capitalize font-semibold">{theme}</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+
+              {/* Theme Dropdown Menu */}
+              {themeMenuOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-30" 
+                    onClick={() => setThemeMenuOpen(false)} 
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-48 py-1.5 bg-card/95 backdrop-blur-2xl border border-theme-500/30 rounded-xl shadow-2xl z-40 animate-in fade-in zoom-in-95 duration-150 custom-scrollbar max-h-64 overflow-y-auto">
+                    <div className="px-3 py-1 text-[10px] font-mono text-muted-foreground uppercase tracking-wider border-b border-border/50">
+                      Terminal UI Color
+                    </div>
+                    {THEME_COLOR_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={async () => {
+                          setTheme(p.id);
+                          setThemeMenuOpen(false);
+                          try {
+                            await axios.put("/api/system/settings", { theme: p.id });
+                          } catch(e) {}
+                        }}
+                        className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-mono text-left transition-colors ${
+                          theme === p.id 
+                            ? 'bg-theme-500/20 text-theme-200 font-bold' 
+                            : 'text-foreground hover:bg-theme-500/10 hover:text-theme-300'
+                        }`}
+                      >
+                        <span 
+                          className="w-3 h-3 rounded-full border border-black/40 shadow-sm shrink-0" 
+                          style={{ backgroundColor: p.color }} 
+                        />
+                        <span className="truncate">{p.name}</span>
+                        {theme === p.id && <span className="ml-auto text-theme-400 text-xs">✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* Auto-scroll Toggle Switch */}
             <button
               type="button"
@@ -613,16 +692,16 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
               }
               className={`flex items-center gap-2 px-2.5 py-1 rounded-lg border font-mono text-xs transition-all select-none active:scale-95 ${
                 autoScroll
-                  ? "bg-theme-500/15 border-theme-500/40 text-theme-300 shadow-sm shadow-theme-500/10"
-                  : "bg-white/5 hover:bg-white/10 border-white/15 text-slate-400 hover:text-slate-200"
+                  ? "bg-red-500/15 border-red-500/40 text-red-300 shadow-sm shadow-red-500/10"
+                  : "bg-blue-600/15 border-blue-500/40 text-blue-300 shadow-sm shadow-blue-500/10"
               }`}
             >
-              <ArrowDownToLine className={`w-3.5 h-3.5 ${autoScroll ? "text-theme-400 animate-pulse" : "text-slate-500"}`} />
+              <ArrowDownToLine className={`w-3.5 h-3.5 ${autoScroll ? "text-red-400 animate-pulse" : "text-blue-400"}`} />
               <span className="hidden sm:inline font-semibold">Auto-scroll</span>
-              {/* Interactive Switch Track & Knob */}
+              {/* Interactive Switch Track & Knob (ON = Red, OFF = Blue) */}
               <div
                 className={`w-7 h-4 rounded-full p-0.5 transition-colors relative flex items-center ${
-                  autoScroll ? "bg-theme-500" : "bg-zinc-700"
+                  autoScroll ? "bg-red-600 shadow-[0_0_8px_rgba(220,38,38,0.5)]" : "bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"
                 }`}
               >
                 <div
@@ -635,20 +714,20 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
 
             {isOnline ? (
               <div 
-                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-theme-500/10 border border-theme-500/30 text-theme-300 font-mono text-[11px] shadow-sm shadow-theme-500/15"
+                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 font-mono text-[11px] shadow-sm shadow-red-500/15"
                 title={startInfo.full}
               >
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-theme-500"></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
                 </span>
-                <span className="font-bold text-theme-300">Online</span>
-                <span className="text-theme-400/80 text-[10px] hidden xs:inline">• {uptime}</span>
+                <span className="font-bold text-red-300">Online</span>
+                <span className="text-red-400/80 text-[10px] hidden xs:inline">• {uptime}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-400 font-mono text-[11px]">
-                <span className="inline-flex rounded-full h-2 w-2 bg-slate-500"></span>
-                <span>Stopped</span>
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 font-mono text-[11px] shadow-sm shadow-blue-500/10">
+                <span className="inline-flex rounded-full h-2 w-2 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></span>
+                <span className="font-bold text-blue-300">Stopped</span>
               </div>
             )}
 
@@ -668,7 +747,10 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
           <div
             ref={bodyRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-auto p-3.5 sm:p-5 font-mono text-[13px] sm:text-[14px] leading-relaxed bg-black/50 backdrop-blur-md custom-scrollbar select-text space-y-1"
+            className="flex-1 overflow-y-auto p-3.5 sm:p-5 font-mono text-[13px] sm:text-[14px] leading-relaxed backdrop-blur-md custom-scrollbar select-text space-y-1 transition-colors duration-300"
+            style={{
+              background: 'radial-gradient(ellipse at top, color-mix(in srgb, var(--theme-500) 8%, var(--bg-background, #050508)), var(--bg-background, #050508) 80%)'
+            }}
             role="log"
           >
             {logs.length === 0 && (
@@ -691,13 +773,13 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
             <button
               onClick={scrollToBottom}
               title="Auto-scroll is paused. Click to jump to bottom and resume auto-scroll."
-              className="absolute bottom-3 right-4 z-20 px-3 py-1.5 rounded-full bg-zinc-900/95 hover:bg-theme-500 hover:text-black border border-theme-500/40 text-theme-300 shadow-2xl backdrop-blur-md flex items-center gap-1.5 text-xs font-mono font-bold transition-all duration-200 active:scale-95 group"
+              className="absolute bottom-3 right-4 z-20 px-3 py-1.5 rounded-full bg-card/95 hover:bg-theme-500 hover:text-white border border-theme-500/40 text-theme-300 shadow-2xl backdrop-blur-md flex items-center gap-1.5 text-xs font-mono font-bold transition-all duration-200 active:scale-95 group"
             >
               <ArrowDownToLine className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
               <span className="hidden xs:inline">Auto-scroll</span>
               <span className="text-[11px] opacity-80">Bottom</span>
               {unreadCount > 0 && (
-                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-theme-500 text-black text-[10px] font-bold font-mono shadow-md flex items-center justify-center">
+                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-theme-500 text-white text-[10px] font-bold font-mono shadow-md flex items-center justify-center">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
@@ -706,7 +788,7 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
         </div>
 
         {/* QUICK COMMANDS SECTION */}
-        <div className="px-3.5 sm:px-4 py-2.5 border-t border-white/10 bg-black/40 backdrop-blur-md flex items-center gap-2 overflow-x-auto custom-scrollbar">
+        <div className="px-3.5 sm:px-4 py-2.5 border-t border-theme-500/20 bg-card/70 backdrop-blur-md flex items-center gap-2 overflow-x-auto custom-scrollbar transition-colors duration-300">
           <span className="font-mono text-xs font-bold uppercase tracking-wider text-theme-300 shrink-0 flex items-center gap-1.5 mr-1">
             <Sparkles className="w-3.5 h-3.5 text-theme-400" /> Quick:
           </span>
@@ -739,7 +821,7 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
             <button
               key={q.cmd}
               onClick={() => fillQuickCommand(q.cmd)}
-              className="min-h-[34px] sm:min-h-[36px] px-3.5 py-1.5 rounded-xl bg-theme-500/10 border border-theme-500/30 text-theme-300 hover:text-theme-100 hover:border-theme-400 hover:bg-theme-500/20 font-mono text-xs sm:text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 shrink-0"
+              className="min-h-[34px] sm:min-h-[36px] px-3.5 py-1.5 rounded-xl bg-theme-500/10 border border-theme-500/30 text-theme-300 hover:text-theme-100 hover:border-theme-400 hover:bg-theme-500/20 font-mono text-xs sm:text-[13px] font-semibold whitespace-nowrap transition-all active:scale-95 shrink-0 shadow-sm shadow-theme-500/10"
             >
               {q.label}
             </button>
@@ -747,8 +829,8 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
         </div>
 
         {/* NEAT & CLEAN COMMAND TYPE BAR */}
-        <form onSubmit={sendCommand} className="p-2.5 sm:p-3.5 border-t border-white/10 bg-black/60 backdrop-blur-xl flex gap-2.5 items-center">
-          <div className="flex-1 min-h-[46px] flex items-center rounded-xl border border-theme-500/30 bg-black/50 px-3.5 py-1.5 focus-within:border-theme-500/80 focus-within:ring-2 focus-within:ring-theme-500/30 transition-all">
+        <form onSubmit={sendCommand} className="p-2.5 sm:p-3.5 border-t border-theme-500/20 bg-card/85 backdrop-blur-xl flex gap-2.5 items-center transition-colors duration-300">
+          <div className="flex-1 min-h-[46px] flex items-center rounded-xl border border-theme-500/30 bg-background/80 px-3.5 py-1.5 focus-within:border-theme-500/80 focus-within:ring-2 focus-within:ring-theme-500/30 transition-all">
             <span className="text-theme-400 font-mono text-base font-bold mr-2.5 select-none shrink-0">&gt;</span>
             <input
               ref={inputRef}
@@ -764,13 +846,13 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
               })()}
               spellCheck="false"
               autoComplete="off"
-              className="w-full bg-transparent py-1 text-sm sm:text-base font-mono text-white focus:outline-none placeholder:text-theme-400/40 caret-theme-400"
+              className="w-full bg-transparent py-1 text-sm sm:text-base font-mono text-foreground focus:outline-none placeholder:text-theme-400/40 caret-theme-400"
             />
           </div>
           <button
             type="submit"
             disabled={!command.trim()}
-            className="min-h-[46px] px-5 sm:px-6 py-2 rounded-xl font-mono text-xs sm:text-sm font-bold text-black bg-theme-500 hover:bg-theme-400 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-lg shadow-theme-500/20 shrink-0 flex items-center gap-2"
+            className="min-h-[46px] px-5 sm:px-6 py-2 rounded-xl font-mono text-xs sm:text-sm font-bold text-white bg-theme-600 hover:bg-theme-500 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all shadow-lg shadow-theme-500/30 shrink-0 flex items-center gap-2 border border-theme-500/40"
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">Send</span>
@@ -778,67 +860,96 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
         </form>
 
         {/* VITALS DOCK AT THE BOTTOM OF THE CONSOLE */}
-        <div className="border-t border-white/10 bg-black/40 backdrop-blur-md p-3 sm:p-3.5">
+        <div className="border-t border-theme-500/20 bg-card/75 backdrop-blur-md p-3 sm:p-3.5 transition-colors duration-300">
           <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
             
             {/* CPU VITAL */}
-            <div
-              className="p-2.5 sm:p-3 rounded-xl bg-theme-500/[0.03] border border-theme-500/20 flex flex-col justify-between"
-              title="Individual server CPU usage (isolated from host and panel processes)"
-            >
-              <div className="flex items-center justify-between gap-1 mb-2">
-                <span className="flex items-center gap-1 font-mono text-[11px] sm:text-xs uppercase font-bold text-theme-400">
-                  <Cpu className="w-3.5 h-3.5 text-theme-400" />
-                  <span>CPU</span>
-                </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white">
-                  <FormattedNumber value={stats.cpu} dec={1} />%
-                </span>
-              </div>
-              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+            {(() => {
+              const cpuVal = typeof stats.cpu === 'number' ? stats.cpu : 0;
+              const cpuColorClass = cpuVal > 75 
+                ? "text-red-500 font-bold" 
+                : cpuVal >= 40 
+                ? "text-amber-400 font-bold" 
+                : "text-emerald-400 font-bold";
+              const cpuBarClass = cpuVal > 75 
+                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" 
+                : cpuVal >= 40 
+                ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]" 
+                : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]";
+
+              return (
                 <div
-                  className="bg-theme-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${cpuPct}%` }}
-                />
-              </div>
-            </div>
+                  className="p-2.5 sm:p-3 rounded-xl bg-theme-500/[0.03] border border-theme-500/20 flex flex-col justify-between"
+                  title="Individual server CPU usage (isolated from host and panel processes)"
+                >
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="flex items-center gap-1 font-mono text-[11px] sm:text-xs uppercase font-bold text-theme-400">
+                      <Cpu className="w-3.5 h-3.5 text-theme-400" />
+                      <span>CPU</span>
+                    </span>
+                    <span className={`font-mono text-xs sm:text-sm ${cpuColorClass}`}>
+                      <FormattedNumber value={stats.cpu} dec={1} />%
+                    </span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${cpuBarClass}`}
+                      style={{ width: `${cpuPct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* RAM VITAL */}
-            <div
-              className={`p-2.5 sm:p-3 rounded-xl border flex flex-col justify-between transition-colors ${
-                isOverMemoryLimit
-                  ? "bg-amber-500/[0.08] border-amber-500/40"
-                  : "bg-theme-500/[0.03] border-theme-500/20"
-              }`}
-              title="This value measures only this server's Docker container or Java process. It does not include VPS memory, Node.js panel memory, Docker daemon memory, Linux cache, or other servers."
-            >
-              <div className="flex items-center justify-between gap-1 mb-2">
-                <span className="flex items-center gap-1 font-mono text-[11px] sm:text-xs uppercase font-bold text-theme-400">
-                  <MemoryStick className="w-3.5 h-3.5 text-theme-400" />
-                  <span>RAM</span>
-                  <span className="text-[9px] font-normal text-muted-foreground ml-0.5 opacity-80 lowercase">
-                    ({metricSourceLabel})
-                  </span>
-                </span>
-                <div className="flex items-center gap-1 font-mono text-xs sm:text-sm font-bold text-white truncate">
-                  {isOverMemoryLimit && (
-                    <span title="Memory usage exceeds configured limit" className="inline-flex items-center">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    </span>
-                  )}
-                  <span>{formattedUsedRam}</span>
-                  <span className="text-[10px] text-theme-400/80 ml-0.5">/ {formattedLimitRam}</span>
-                </div>
-              </div>
-              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+            {(() => {
+              const ramColorClass = isOverMemoryLimit || ramPct > 80
+                ? "text-red-500 font-bold"
+                : ramPct >= 50
+                ? "text-amber-400 font-bold"
+                : "text-emerald-400 font-bold";
+              const ramBarClass = isOverMemoryLimit || ramPct > 80
+                ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
+                : ramPct >= 50
+                ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+                : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]";
+
+              return (
                 <div
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    isOverMemoryLimit ? "bg-amber-400" : "bg-theme-500"
+                  className={`p-2.5 sm:p-3 rounded-xl border flex flex-col justify-between transition-colors ${
+                    isOverMemoryLimit
+                      ? "bg-red-500/[0.08] border-red-500/40"
+                      : "bg-theme-500/[0.03] border-theme-500/20"
                   }`}
-                  style={{ width: `${ramPct}%` }}
-                />
-              </div>
-            </div>
+                  title="This value measures only this server's Docker container or Java process. It does not include VPS memory, Node.js panel memory, Docker daemon memory, Linux cache, or other servers."
+                >
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="flex items-center gap-1 font-mono text-[11px] sm:text-xs uppercase font-bold text-theme-400">
+                      <MemoryStick className="w-3.5 h-3.5 text-theme-400" />
+                      <span>RAM</span>
+                      <span className="text-[9px] font-normal text-muted-foreground ml-0.5 opacity-80 lowercase">
+                        ({metricSourceLabel})
+                      </span>
+                    </span>
+                    <div className="flex items-center gap-1 font-mono text-xs sm:text-sm truncate">
+                      {isOverMemoryLimit && (
+                        <span title="Memory usage exceeds configured limit" className="inline-flex items-center">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        </span>
+                      )}
+                      <span className={ramColorClass}>{formattedUsedRam}</span>
+                      <span className="text-[10px] text-theme-400/80 ml-0.5">/ {formattedLimitRam}</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${ramBarClass}`}
+                      style={{ width: `${ramPct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* DISK VITAL */}
             <div
@@ -850,7 +961,7 @@ export default function ServerConsole({ serverId, server }: ServerConsoleProps) 
                   <HardDrive className="w-3.5 h-3.5 text-theme-400" />
                   <span>Disk</span>
                 </span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-white truncate">
+                <span className="font-mono text-xs sm:text-sm font-bold text-foreground truncate">
                   <FormattedNumber value={stats.disk} dec={1} />
                   <span className="text-[10px] text-theme-400/80 ml-0.5">/{stats.limitDisk || 10}G</span>
                 </span>

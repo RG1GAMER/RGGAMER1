@@ -24,22 +24,26 @@
 
 [data-ui-theme="black"] {
   --bg-background: #000000;
-  --bg-card: #09090b;
+  --bg-card: #000000;
   
   --text-foreground: #ffffff;
   --text-foreground-muted: #e4e4e7;
   --text-muted-foreground: #a1a1aa;
   
-  --border-border: rgba(255, 255, 255, 0.12);
-  --border-border-subtle: rgba(255, 255, 255, 0.06);
-  --border-border-strong: rgba(255, 255, 255, 0.22);
+  --border-border: rgba(255, 255, 255, 0.16);
+  --border-border-subtle: rgba(255, 255, 255, 0.08);
+  --border-border-strong: rgba(255, 255, 255, 0.3);
   
-  --bg-muted: rgba(255, 255, 255, 0.05);
-  --bg-muted-hover: rgba(255, 255, 255, 0.1);
-  --bg-muted-subtle: rgba(255, 255, 255, 0.02);
+  --bg-muted: #050507;
+  --bg-muted-hover: #121216;
+  --bg-muted-subtle: #000000;
+
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #000000;
 }
 
-[data-ui-theme="light"] {
+[data-ui-theme="light"],
+[data-ui-theme="white"] {
   --bg-background: #f4f4f6;
   --bg-card: #ffffff;
   
@@ -224,6 +228,41 @@ body {
   background-color: var(--bg-background);
   color: var(--text-foreground);
   transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* ========================================================================= */
+/* OPTIONS & SELECT ELEMENTS STYLING (Black / White themes) */
+/* ========================================================================= */
+select, option {
+  background-color: var(--bg-card);
+  color: var(--text-foreground);
+}
+
+[data-ui-theme="black"] select,
+[data-ui-theme="black"] option,
+[data-theme="black"] select,
+[data-theme="black"] option {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+[data-ui-theme="white"] option,
+[data-ui-theme="light"] option,
+[data-theme="white"] option {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+
+/* ========================================================================= */
+/* GLOBAL TOGGLE SWITCHES: OFF = BLUE (#2563eb), ON = RED (#dc2626) */
+/* ========================================================================= */
+.jtg-toggle-off {
+  background-color: #2563eb !important;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
+}
+.jtg-toggle-on {
+  background-color: #dc2626 !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.5);
 }
 
 @keyframes qx-fade-up {

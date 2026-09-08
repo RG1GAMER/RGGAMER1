@@ -20,10 +20,11 @@ import {
 import axios from "axios";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
-import { Server, Plus, ChevronRight, Settings, Lock } from "lucide-react";
+import { Server, Plus, ChevronRight, Settings, Lock, Trash2 } from "lucide-react";
 import { motion, type Variants } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import ServerLiveStats from "../components/ServerLiveStats";
+import DeleteServerModal from "../components/DeleteServerModal";
 
 /* ── STEP 2 · Types ───────────────────────────────────────────────────────── */
 type ServerStatus = "online" | "offline" | (string & {});
@@ -101,7 +102,7 @@ function useServers(pollIntervalMs = POLL_INTERVAL_MS): ServersState {
     };
   }, [fetchServers, pollIntervalMs]);
 
-  return { servers, error, isLoading };
+  return { servers, error, isLoading, refetch: () => fetchServers() };
 }
 
 /* ── STEP 5 · Primitives ──────────────────────────────────────────────────── */
@@ -113,19 +114,19 @@ const StatusBadge = memo(function StatusBadge({
   const online = isOnline(status);
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide border ${
         online
-          ? "bg-theme-600/10 text-theme-500 ring-1 ring-inset ring-theme-600/20"
-          : "bg-muted text-muted-foreground ring-1 ring-inset ring-border"
+          ? "bg-red-500/10 text-red-400 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
+          : "bg-blue-500/10 text-blue-400 border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.15)]"
       }`}
     >
       <span className="relative flex h-1.5 w-1.5">
         {online && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-theme-500/80 motion-reduce:hidden" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400/80 motion-reduce:hidden" />
         )}
         <span
           className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
-            online ? "bg-theme-500" : "bg-zinc-500"
+            online ? "bg-red-500" : "bg-blue-500"
           }`}
         />
       </span>
@@ -151,8 +152,12 @@ function Metric({ label, children }: { label: string; children: ReactNode }) {
 /* ── STEP 6 · ServerCard ──────────────────────────────────────────────────── */
 const ServerCard = memo(function ServerCard({
   server,
+  isAdmin,
+  onDelete,
 }: {
   server: ServerRecord;
+  isAdmin?: boolean;
+  onDelete?: (server: ServerRecord) => void;
 }) {
   const online = isOnline(server.status);
   const isSuspended = server.suspended;
@@ -191,9 +196,25 @@ const ServerCard = memo(function ServerCard({
             </div>
           </div>
         </div>
-        {!isSuspended && (
-          <ChevronRight className="mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground-muted" />
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDelete?.(server);
+              }}
+              title="Administrative Deletion (Mandatory Confirmation)"
+              className="p-2 rounded-xl text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors z-20 border border-transparent hover:border-red-500/20"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+          {!isSuspended && (
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground-muted" />
+          )}
+        </div>
       </div>
       {/* 6.3 · Metrics */}
       <div className="mt-5 grid grid-cols-2 gap-4 rounded-xl border border-border-subtle bg-muted px-4 py-4 sm:grid-cols-4">
@@ -287,7 +308,8 @@ function EmptyState({ isAdmin }: { isAdmin: boolean }) {
 /* ── STEP 8 · Page composition ────────────────────────────────────────────── */
 export default function ServerList() {
   const { user } = useAuth();
-  const { servers, error, isLoading } = useServers();
+  const { servers, error, isLoading, refetch } = useServers();
+  const [deletingServer, setDeletingServer] = useState<ServerRecord | null>(null);
 
   // 8.1 · Gating — resolve auth BEFORE making any role decision.
   //        `user` is undefined while auth is still restoring; null when logged
@@ -352,13 +374,29 @@ export default function ServerList() {
         >
           {hasServers ? (
             servers.map((server) => (
-              <ServerCard key={server.id} server={server} />
+              <ServerCard
+                key={server.id}
+                server={server}
+                isAdmin={isAdmin}
+                onDelete={(s) => setDeletingServer(s)}
+              />
             ))
           ) : (
             <EmptyState isAdmin={isAdmin} />
           )}
         </motion.section>
       </div>
+
+      {/* Mandatory Administrative Confirmation Modal for Destructive Deletion */}
+      <DeleteServerModal
+        isOpen={!!deletingServer}
+        server={deletingServer}
+        onClose={() => setDeletingServer(null)}
+        onSuccess={() => {
+          setDeletingServer(null);
+          refetch();
+        }}
+      />
     </div>
   );
 }

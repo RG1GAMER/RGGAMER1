@@ -35,24 +35,24 @@ export function ServerCard({ server }: ServerCardProps) {
             </div>
           </div>
 
-          {/* Status Badge */}
+          {/* Status Badge (Online = Red, Offline = Blue) */}
           <div className="shrink-0">
             {isOnline ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-theme-600/10 text-theme-500 border border-theme-600/20">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-500/10 text-red-400 border border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.15)]">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-500 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-theme-600" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
                 </span>
                 Online
               </span>
             ) : isStarting ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-theme-600/10 text-theme-500 border border-theme-600/20">
-                <span className="h-2 w-2 rounded-full bg-theme-500 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
                 Starting
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-muted text-muted-foreground border border-border/50">
-                <span className="h-2 w-2 rounded-full bg-zinc-500" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.15)]">
+                <span className="h-2 w-2 rounded-full bg-blue-500" />
                 Offline
               </span>
             )}

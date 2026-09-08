@@ -69,13 +69,19 @@ export default function ServerLiveStats({ serverId, limitRam = 2, status = "offl
   }
 
   const formattedUsed = usedBytes !== null ? formatBytesToDisplay(usedBytes) : "...";
+  const limitBytes = safeLimitRamGB * 1024 * 1024 * 1024;
+  const pct = usedBytes !== null && limitBytes > 0 ? (usedBytes / limitBytes) * 100 : 0;
+  
+  const colorClass = isOverLimit || pct > 80 
+    ? "text-red-400 font-semibold" 
+    : pct >= 50 
+    ? "text-amber-400 font-semibold" 
+    : "text-emerald-400 font-semibold";
 
   return (
     <span
-      className={`font-mono text-xs md:text-sm ${
-        isOverLimit ? "text-amber-400 font-semibold" : "text-foreground-muted"
-      }`}
-      title={isOverLimit ? "Memory usage exceeds configured limit" : "Container / Java memory usage"}
+      className={`font-mono text-xs md:text-sm ${colorClass}`}
+      title={isOverLimit ? "Memory usage exceeds configured limit" : `Memory usage: ${Math.round(pct)}%`}
     >
       {formattedUsed} <span className="text-muted-foreground">/ {safeLimitRamGB} GB</span>
     </span>

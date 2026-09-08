@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { LoadingOverlay } from "../components/LoadingOverlay";
 import { useParams, Link, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Terminal, Folder, Play, Square, RefreshCw, ArrowLeft, Sliders, Archive, AlertTriangle, Copy, Check, Menu, X, Users, LogOut, Lock, Globe, Zap, Sparkles, Radio } from "lucide-react";
+import { Terminal, Folder, Play, Square, RefreshCw, ArrowLeft, Sliders, Archive, AlertTriangle, Copy, Check, Menu, X, Users, LogOut, Lock, Globe, Zap, Sparkles, Radio, LayoutDashboard, Plus, Server as ServerIcon, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "../context/AuthContext";
 
 import ServerConsole from "../components/ServerConsole";
 import ServerResourceDashboard from "../components/ServerResourceDashboard";
@@ -23,6 +24,7 @@ import WorldManager from "../components/WorldManager";
 import ResourcePackManager from "../components/ResourcePackManager";
 import AddonsManager from "../components/AddonsManager";
 import SoftwareManager from "../components/SoftwareManager";
+import { PlayitFirstStartModal } from "../components/PlayitFirstStartModal";
 import { Map, Palette } from "lucide-react";
 import { Puzzle, Box, Network, Cpu, Layers as LayersIcon } from "lucide-react";
 import { Settings } from "lucide-react";
@@ -33,6 +35,7 @@ export default function ServerView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { enablePlayit } = useSettings();
+  const { user } = useAuth();
   const [server, setServer] = useState<any>(null);
   const [totalSystemRam, setTotalSystemRam] = useState<number>(0);
   const [showRamWarning, setShowRamWarning] = useState(false);
@@ -40,6 +43,27 @@ export default function ServerView() {
   const [isProcessing, setIsProcessing] = useState(false);
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(() => {
+    return localStorage.getItem("jtg_server_sidebar_collapsed") === "true";
+  });
+
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 768) {
+      if (desktopSidebarCollapsed) {
+        setSidebarOpen(prev => !prev);
+      } else {
+        setDesktopSidebarCollapsed(true);
+        localStorage.setItem("jtg_server_sidebar_collapsed", "true");
+      }
+    } else {
+      setSidebarOpen(prev => !prev);
+    }
+  };
+
+  // Auto-close mobile sidebar on page navigation ("jab click kar da to hat ja")
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   // Playit Agent & Tunnel State
   const [playitStatus, setPlayitStatus] = useState<"running" | "stopped" | "checking">("checking");
@@ -47,6 +71,7 @@ export default function ServerView() {
   const [isPlayitProcessing, setIsPlayitProcessing] = useState(false);
   const [copiedPlayit, setCopiedPlayit] = useState(false);
   const [pendingAction, setPendingAction] = useState<string>("start");
+  const [showPlayitFirstStartModal, setShowPlayitFirstStartModal] = useState(false);
 
   const handleCopyIp = () => {
     if (!server) return;
@@ -115,12 +140,36 @@ export default function ServerView() {
   };
 
   const handleAction = async (action: string) => {
+    // If it's the very first time starting this server, trigger the Playit Setup & Plugin confirmation modal!
+    if (
+      (action === 'start' || action === 'start-both') &&
+      server &&
+      !server.hasStartedOnce &&
+      !server.firstStartDone &&
+      (server.status === 'offline' || server.status === 'stopped')
+    ) {
+      setPendingAction(action);
+      setShowPlayitFirstStartModal(true);
+      return;
+    }
+
     if ((action === 'start' || action === 'start-both') && totalSystemRam > 0 && server?.ram > totalSystemRam && !showRamWarning) {
       setPendingAction(action);
       setShowRamWarning(true);
       return;
     }
     executeAction(action);
+  };
+
+  const handleProceedFirstStart = async (options: { installPlugin: boolean; withPlayit: boolean }) => {
+    setShowPlayitFirstStartModal(false);
+    if (options.withPlayit) {
+      await executeAction('start-both');
+    } else {
+      await executeAction('start');
+    }
+    await fetchServer();
+    await fetchPlayitStatus();
   };
 
   const handlePlayitStart = async () => {
@@ -171,7 +220,7 @@ export default function ServerView() {
         </p>
         <Link 
           to="/servers" 
-          className="inline-flex items-center justify-center px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-foreground text-sm font-medium rounded-lg transition-colors border border-border-subtle"
+          className="inline-flex items-center justify-center px-6 py-2.5 bg-muted hover:bg-muted-hover text-foreground text-sm font-medium rounded-lg transition-colors border border-border"
         >
           Return to Dashboard
         </Link>
@@ -227,8 +276,22 @@ export default function ServerView() {
   }
 
   const navTabs: any[] = [
-    { name: "Back to Dashboard", path: `/servers`, exactPath: "back", icon: <LogOut size={18} /> }
+    { name: "Overview", path: `/`, exactPath: "overview", icon: <LayoutDashboard size={18} /> },
+    { name: "All Servers", path: `/servers`, exactPath: "servers", icon: <ServerIcon size={18} /> },
+    { name: "Deploy Server", path: `/servers/create`, exactPath: "create", icon: <Plus size={18} /> },
   ];
+
+  if (user?.role === "admin" || user?.role === "owner") {
+    navTabs.push(
+      { name: "Fleet", path: `/admin/servers`, exactPath: "fleet", icon: <Box size={18} /> },
+      { name: "Nodes", path: `/nodes`, exactPath: "nodes", icon: <Cpu size={18} /> },
+      { name: "Admin Settings", path: `/admin/settings`, exactPath: "admin", icon: <Settings size={18} /> }
+    );
+  }
+
+  navTabs.push(
+    { name: "Account", path: `/account`, exactPath: "account", icon: <Users size={18} /> }
+  );
 
   return (
     <motion.div 
@@ -243,26 +306,50 @@ export default function ServerView() {
       {/* Drawer Overlay */}
       {sidebarOpen && (
         <div 
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity" 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity cursor-pointer" 
           onClick={() => setSidebarOpen(false)} 
         />
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-card/95 md:bg-card/90 backdrop-blur-3xl border-r border-theme-500/20 flex flex-col shadow-2xl shadow-theme-900/50 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div 
+        className={`fixed inset-y-0 left-0 z-50 bg-card/95 md:bg-card/90 backdrop-blur-3xl border-r border-theme-500/20 flex flex-col shadow-2xl shadow-theme-900/50 transition-all duration-300 ease-in-out shrink-0 ${
+          sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'
+        } ${
+          !desktopSidebarCollapsed ? 'md:relative md:translate-x-0 md:w-64 md:opacity-100' : ''
+        }`}
+      >
         <div className="flex items-center justify-between p-4 border-b border-theme-500/20 shrink-0 bg-card/80">
           <div className="flex items-center gap-3 min-w-0">
-             <Link to="/servers" className="p-1.5 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-lg text-theme-400 hover:text-theme-100 transition-all shrink-0">
+             <Link to="/servers" className="p-1.5 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-lg text-theme-400 hover:text-theme-100 transition-all shrink-0" title="Back to Servers">
               <ArrowLeft size={16} />
             </Link>
             <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-theme-300 via-theme-200 to-theme-400 bg-clip-text text-transparent truncate pr-2">{server.name}</h1>
           </div>
-          <button 
-            onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-1.5 text-muted-foreground hover:text-foreground bg-muted rounded-lg transition-colors"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Desktop Slide-away / Collapse Button when docked */}
+            {!desktopSidebarCollapsed && (
+              <button 
+                onClick={() => {
+                  setDesktopSidebarCollapsed(true);
+                  localStorage.setItem("jtg_server_sidebar_collapsed", "true");
+                }}
+                className="hidden md:flex p-1.5 text-theme-400 hover:text-theme-100 bg-theme-500/10 hover:bg-theme-500/20 border border-theme-500/30 rounded-lg transition-colors cursor-pointer"
+                title="Slide Away Sidebar (Full Screen Terminal)"
+              >
+                <PanelLeftClose size={16} />
+              </button>
+            )}
+
+            {/* Close Button in drawer mode (mobile, or desktop when in full slide mode) */}
+            <button 
+              onClick={() => setSidebarOpen(false)}
+              className={`${desktopSidebarCollapsed ? 'flex' : 'md:hidden flex'} p-1.5 text-muted-foreground hover:text-foreground bg-muted rounded-lg transition-colors cursor-pointer`}
+              title="Close Menu"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-1 custom-scrollbar">
@@ -335,6 +422,15 @@ export default function ServerView() {
                     <span className="hidden group-hover:inline">Stop Playit Tunnel</span>
                   </button>
                 )}
+
+                <button
+                  onClick={() => { setShowPlayitFirstStartModal(true); setSidebarOpen(false); }}
+                  className="col-span-2 py-1.5 bg-card hover:bg-muted text-muted-foreground hover:text-foreground text-xs rounded-lg border border-border hover:border-theme-500/40 flex items-center justify-center gap-1.5 transition-colors"
+                  title="Open Playit Agent & Plugin Assistant"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-theme-500" />
+                  <span>Playit Setup &amp; Plugin Assistant</span>
+                </button>
              </div>
           </div>
           
@@ -385,15 +481,19 @@ export default function ServerView() {
         {/* Top Header with Hamburger and Power Controls */}
         <div className="bg-card/90 backdrop-blur-2xl border-b border-theme-500/20 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-lg relative z-20">
           
-          {/* Left: Hamburger + Server Name + Status */}
+          {/* Left: 3-Lines Hamburger Menu Button + Server Name + Status */}
           <div className="flex items-center gap-2.5 min-w-0">
             <button 
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="md:hidden p-2 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-xl text-theme-300 hover:text-white transition-all flex items-center justify-center relative overflow-hidden group shrink-0"
-              title="Open Navigation Menu"
+              onClick={toggleSidebar}
+              className={`p-2.5 border shadow-sm rounded-xl transition-all items-center justify-center shrink-0 active:scale-95 cursor-pointer ${
+                desktopSidebarCollapsed 
+                  ? 'flex bg-theme-500/25 border-theme-400 text-theme-100 ring-2 ring-theme-500/40 shadow-theme-500/25' 
+                  : 'flex md:hidden bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border-theme-500/30 text-theme-300 hover:text-white'
+              }`}
+              title={desktopSidebarCollapsed ? "Show Server Menu Options (3 Lines)" : "Menu"}
+              aria-label="Toggle Server Navigation Menu"
             >
-              <div className="absolute inset-0 bg-theme-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              <Menu size={18} className="relative z-10 group-hover:text-theme-300 transition-colors" />
+              <Menu size={20} className="text-theme-400" />
             </button>
 
             <div className="flex items-center gap-2 min-w-0">
@@ -401,13 +501,32 @@ export default function ServerView() {
                 {server.name}
               </h1>
 
-              {/* Status Pill */}
-              <div className="flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-muted/60 border border-border shrink-0">
+              {/* Desktop Full-Slide Mode Indicator */}
+              {desktopSidebarCollapsed && (
+                <button 
+                  onClick={() => {
+                    setDesktopSidebarCollapsed(false);
+                    localStorage.setItem("jtg_server_sidebar_collapsed", "false");
+                  }}
+                  className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-theme-500/15 hover:bg-theme-500/25 border border-theme-500/35 text-[11px] font-mono text-theme-300 font-medium cursor-pointer transition-colors shadow-sm"
+                  title="Click to restore sidebar menu"
+                >
+                  <PanelLeftOpen size={12} className="text-theme-400" />
+                  <span>Full Slide</span>
+                </button>
+              )}
+
+              {/* Status Pill (Online = Red, Offline = Blue) */}
+              <div className={`flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full border shrink-0 ${
+                server.status === 'online' 
+                  ? 'bg-red-500/10 border-red-500/30' 
+                  : 'bg-blue-500/10 border-blue-500/30'
+              }`}>
                 <span className="flex h-2 w-2 relative shrink-0">
-                  {server.status === 'online' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-theme-400 opacity-75"></span>}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${server.status === 'online' ? 'bg-theme-500' : 'bg-red-500'}`}></span>
+                  {server.status === 'online' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${server.status === 'online' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'}`}></span>
                 </span>
-                <span className={`text-[11px] font-mono capitalize ${server.status === 'online' ? 'text-theme-400' : 'text-zinc-400'}`}>
+                <span className={`text-[11px] font-mono capitalize font-bold ${server.status === 'online' ? 'text-red-400' : 'text-blue-400'}`}>
                   {server.status}
                 </span>
               </div>
@@ -581,6 +700,22 @@ export default function ServerView() {
         </div>
       </div>
 
+      {/* Desktop Quick-Expand Edge Slide Tab when in Full Slide mode */}
+      {desktopSidebarCollapsed && (
+        <button
+          onClick={() => {
+            setSidebarOpen(true);
+          }}
+          className="hidden md:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 p-2 pl-1.5 pr-2.5 rounded-r-xl bg-card/95 hover:bg-theme-600 text-theme-300 hover:text-white shadow-2xl border-y border-r border-theme-500/40 backdrop-blur-xl transition-all duration-200 group items-center gap-1 cursor-pointer select-none"
+          title="Slide Out Server Menu Options"
+        >
+          <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform text-theme-400 group-hover:text-white" />
+          <span className="text-[10px] font-mono font-bold tracking-wider uppercase [writing-mode:vertical-lr] rotate-180 py-1">
+            Menu
+          </span>
+        </button>
+      )}
+
       </div>
 
       <AnimatePresence>
@@ -590,7 +725,7 @@ export default function ServerView() {
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-[#121214] border border-theme-500/30 shadow-2xl shadow-theme-500/10 rounded-2xl p-6 max-w-md w-full relative overflow-hidden"
+              className="bg-card border border-border shadow-2xl shadow-theme-500/10 rounded-2xl p-6 max-w-md w-full relative overflow-hidden text-foreground"
             >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-theme-500 to-theme-600" />
               <div className="flex items-start mb-4">
@@ -628,6 +763,17 @@ export default function ServerView() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Playit Setup & First Start Modal */}
+      {server && (
+        <PlayitFirstStartModal
+          serverId={server.id}
+          serverName={server.name}
+          isOpen={showPlayitFirstStartModal}
+          onClose={() => setShowPlayitFirstStartModal(false)}
+          onProceedStart={handleProceedFirstStart}
+        />
+      )}
 
       {isProcessing && (
         <LoadingOverlay

@@ -1,5 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import path from "path";
+import fs from "fs-extra";
+import axios from "axios";
 import {
   importWorld,
   getWorldInfo,
@@ -565,6 +567,122 @@ router.get("/:id/playit/audit", async (req, res) => {
     res.json({ auditLogs });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to load audit logs", details: err.message });
+  }
+});
+
+// Check Playit Plugin status in plugins/ directory
+router.get("/:id/playit/plugin-status", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    const pluginsDir = path.join(serverDir, "plugins");
+
+    if (!(await fs.pathExists(pluginsDir))) {
+      return res.json({ installed: false, fileName: null, size: 0, latestVersion: "0.2.0" });
+    }
+
+    const files = await fs.readdir(pluginsDir);
+    const playitFile = files.find(f => f.toLowerCase().startsWith("playit") && f.toLowerCase().endsWith(".jar"));
+
+    if (playitFile) {
+      const stat = await fs.stat(path.join(pluginsDir, playitFile)).catch(() => null);
+      return res.json({
+        installed: true,
+        fileName: playitFile,
+        size: stat ? stat.size : 0,
+        latestVersion: "0.2.0"
+      });
+    }
+
+    res.json({ installed: false, fileName: null, size: 0, latestVersion: "0.2.0" });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to check plugin status", details: err.message });
+  }
+});
+
+// Install latest official Playit Minecraft plugin directly into plugins/
+router.post("/:id/playit/install-plugin", async (req, res) => {
+  const user = (req as any).user;
+  if (user.role !== "admin" && user.role !== "owner") return res.status(403).json({ error: "Forbidden" });
+
+  const { id } = req.params;
+  try {
+    const { readJSON, writeJSON } = await import("../services/db.js");
+    const servers = await readJSON("servers.json") || [];
+    const serverIndex = servers.findIndex((s: any) => s.id === id);
+    if (serverIndex === -1) return res.status(404).json({ error: "Server not found" });
+
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    const pluginsDir = path.join(serverDir, "plugins");
+    await fs.ensureDir(pluginsDir);
+
+    const { secureDirectoryPermissions, secureFilePermissions } = await import("../utils/permissions.js");
+    await secureDirectoryPermissions(pluginsDir);
+
+    // Official release from playit-cloud github repo
+    const downloadUrl = "https://github.com/playit-cloud/playit-minecraft-plugin/releases/latest/download/playit-minecraft-plugin.jar";
+    const filename = "playit-minecraft-plugin.jar";
+    const filePath = path.join(pluginsDir, filename);
+
+    const response = await axios({
+      url: downloadUrl,
+      method: "GET",
+      responseType: "stream",
+      maxRedirects: 5,
+      timeout: 45000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      }
+    });
+
+    const writer = fs.createWriteStream(filePath);
+    response.data.pipe(writer);
+
+    await new Promise<void>((resolve, reject) => {
+      writer.on("finish", resolve);
+      writer.on("error", reject);
+    });
+
+    await secureFilePermissions(filePath);
+
+    const stat = await fs.stat(filePath).catch(() => null);
+    if (!stat || stat.size < 1000) {
+      await fs.remove(filePath).catch(() => {});
+      return res.status(502).json({ error: "Downloaded plugin was empty or corrupted. Please try again." });
+    }
+
+    servers[serverIndex].playitPluginInstalled = true;
+    await writeJSON("servers.json", servers);
+
+    res.json({
+      success: true,
+      message: "Official Playit.gg plugin installed successfully into plugins folder!",
+      fileName: filename,
+      size: stat.size,
+      version: "0.2.0"
+    });
+  } catch (err: any) {
+    console.error("Playit plugin install failed:", err);
+    res.status(500).json({ error: "Playit plugin installation failed", details: err.message });
+  }
+});
+
+// Mark first start as completed
+router.post("/:id/first-start-done", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { readJSON, writeJSON } = await import("../services/db.js");
+    const servers = await readJSON("servers.json") || [];
+    const serverIndex = servers.findIndex((s: any) => s.id === id);
+    if (serverIndex === -1) return res.status(404).json({ error: "Server not found" });
+
+    servers[serverIndex].firstStartDone = true;
+    servers[serverIndex].hasStartedOnce = true;
+    await writeJSON("servers.json", servers);
+
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update first start status", details: err.message });
   }
 });
 

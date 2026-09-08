@@ -8,7 +8,7 @@ import {
   Cpu, Zap, Sparkles, HardDrive, Globe, User, Radio, GitBranch, Check,
   ChevronDown, Search, Rocket, SlidersHorizontal, FastForward, Network,
   Wrench, Feather, Info, Code2, TerminalSquare, Gamepad2, Layers, HelpCircle,
-  Puzzle, Settings, CheckCircle2, Box, Tag
+  Puzzle, Settings, CheckCircle2, Box, Tag, Menu, X, LayoutDashboard, LogOut
 } from "lucide-react";
 import { SOFTWARE_CATALOG, SOFTWARE_BUILDS_MAP, SoftwareItem } from "../components/SoftwareManager";
 
@@ -202,6 +202,7 @@ export default function CreateServer() {
   const [deployProgress, setDeployProgress] = useState(0);
   const [nameError, setNameError] = useState(false);
   const [dir, setDir] = useState('forward');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const [portStatus, setPortStatus] = useState('idle');
   const portCheckIdRef = useRef(0);
@@ -519,11 +520,120 @@ export default function CreateServer() {
       />
 
       <div className="relative z-10">
-        <nav className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-md">
-          <div className="max-w-4xl mx-auto px-5 h-16 flex items-center justify-between">
-            <button onClick={() => navigate('/servers')} className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-muted-foreground hover:text-foreground transition-colors border border-border hover:border-theme-500 px-3 py-1.5 rounded-lg">
-              <ArrowLeft className="w-3.5 h-3.5" /> INSTANCES
+        {/* Mobile Navigation Drawer Backdrop */}
+        {mobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] md:hidden transition-opacity duration-300"
+            onClick={() => setMobileMenuOpen(false)}
+            title="Click to dismiss menu"
+          />
+        )}
+
+        {/* Mobile Navigation Drawer */}
+        <div className={`fixed inset-y-0 left-0 z-[70] w-64 bg-card/95 backdrop-blur-3xl border-r border-border flex flex-col shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="h-16 flex items-center justify-between border-b border-border px-4 flex-shrink-0">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              {panelLogo ? (
+                <img src={panelLogo} alt={pName} className="w-7 h-7 object-contain rounded" />
+              ) : (
+                <div className="w-7 h-7 bg-theme-600 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-md shadow-theme-500/20 shrink-0">
+                  <div className="w-3.5 h-3.5 bg-white rounded-sm"></div>
+                </div>
+              )}
+              <span className="font-display font-bold text-sm tracking-wide uppercase text-foreground truncate">
+                {pName}
+              </span>
+            </div>
+            <button 
+              onClick={() => setMobileMenuOpen(false)} 
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-colors shrink-0"
+              title="Close Menu"
+            >
+              <X size={20} />
             </button>
+          </div>
+
+          <nav className="flex-1 w-full px-3 py-4 space-y-1 overflow-y-auto custom-scrollbar">
+            <p className="px-3 mb-2 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">Menu</p>
+            <button
+              onClick={() => { navigate('/'); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+            >
+              <LayoutDashboard size={18} />
+              <span>Overview</span>
+            </button>
+            <button
+              onClick={() => { navigate('/servers'); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+            >
+              <Server size={18} />
+              <span>Servers</span>
+            </button>
+            <button
+              onClick={() => { setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-theme-400 bg-theme-500/15 border border-theme-500/30 font-mono text-xs font-bold tracking-wider uppercase"
+            >
+              <Rocket size={18} />
+              <span>Deploy Server</span>
+            </button>
+
+            {(user?.role === 'admin' || user?.role === 'owner') && (
+              <>
+                <div className="pt-3 mt-3 border-t border-border/40">
+                  <p className="px-3 mb-2 font-mono text-[10px] text-muted-foreground tracking-widest uppercase">Admin</p>
+                </div>
+                <button
+                  onClick={() => { navigate('/nodes'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+                >
+                  <Cpu size={18} />
+                  <span>Nodes</span>
+                </button>
+                <button
+                  onClick={() => { navigate('/admin/servers'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+                >
+                  <Box size={18} />
+                  <span>Fleet</span>
+                </button>
+                <button
+                  onClick={() => { navigate('/admin/settings'); setMobileMenuOpen(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+                >
+                  <Settings size={18} />
+                  <span>Admin Settings</span>
+                </button>
+              </>
+            )}
+
+            <div className="pt-3 mt-3 border-t border-border/40">
+              <button
+                onClick={() => { navigate('/account'); setMobileMenuOpen(false); }}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left text-muted-foreground hover:text-foreground hover:bg-muted transition-colors font-mono text-xs tracking-wider uppercase"
+              >
+                <User size={18} />
+                <span>Account</span>
+              </button>
+            </div>
+          </nav>
+        </div>
+
+        <nav className="sticky top-0 z-50 border-b border-border bg-card/90 backdrop-blur-md">
+          <div className="max-w-4xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setMobileMenuOpen(prev => !prev)}
+                className="md:hidden p-2.5 bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border border-theme-500/30 text-theme-300 hover:text-white rounded-xl transition-all flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
+                title="Open All Options Menu"
+                aria-label="Open Navigation Menu"
+              >
+                <Menu size={20} className="text-theme-400" />
+              </button>
+              <button onClick={() => navigate('/servers')} className="flex items-center gap-2 font-mono text-[11px] tracking-widest text-muted-foreground hover:text-foreground transition-colors border border-border hover:border-theme-500 px-3 py-1.5 rounded-lg">
+                <ArrowLeft className="w-3.5 h-3.5" /> <span className="hidden sm:inline">INSTANCES</span>
+              </button>
+            </div>
+
             <a href="#" onClick={(e) => { e.preventDefault(); navigate('/servers'); }} className="flex items-center gap-3 group">
               {panelLogo ? (
                 <img src={panelLogo} alt={pName} className="w-7 h-7 object-contain rounded" />

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Terminal, MapPin, ArrowUpRight, Shield, ChevronDown, ArrowRight, Server, Radio } from 'lucide-react';
+import { Terminal, MapPin, ArrowUpRight, Shield, ChevronDown, ArrowRight, Server, Radio, ExternalLink } from 'lucide-react';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
+import CornerAdWidget from '../components/CornerAdWidget';
 
 
 
@@ -21,12 +22,45 @@ const feedB = [
     ['https://w.wallhaven.cc/full/7j/wallhaven-7je6jo.png','MC_08','MINECRAFT // MULTIPLAYER'],
 ];
 
-const tickerItems = [
+interface TickerItem {
+  label: string;
+  color: string;
+  dot: string;
+  isAd?: boolean;
+  adTag?: string;
+  adLink?: string;
+}
+
+const tickerItems: TickerItem[] = [
     { label: 'UPTIME 99.98%', color: 'text-theme-500', dot: 'bg-theme-500 shadow-[0_0_6px_var(--color-theme-500)]' },
+    { 
+      label: '⚡ PROMO AD: RYZEN 9 7950X DEDICATED HOSTING — 40% OFF CODE: JTG40', 
+      color: 'text-amber-300 font-bold', 
+      dot: 'bg-amber-400 shadow-[0_0_8px_#f59e0b]',
+      isAd: true,
+      adTag: 'HOT AD',
+      adLink: 'https://playit.gg'
+    },
     { label: 'NODES 3/3 ACTIVE', color: 'text-zinc-100', dot: 'bg-zinc-100 shadow-[0_0_6px_#d4d4d8]' },
     { label: 'LATENCY 11MS', color: 'text-theme-500', dot: 'bg-theme-500 shadow-[0_0_6px_var(--color-theme-500)]' },
+    { 
+      label: '🛡️ SPONSORED: DDOS GUARDIAN v4 — ZERO PACKET LOSS FLEET DEFENSE', 
+      color: 'text-emerald-300 font-bold', 
+      dot: 'bg-emerald-400 shadow-[0_0_8px_#10b981]',
+      isAd: true,
+      adTag: 'SPONSORED',
+      adLink: 'https://playit.gg'
+    },
     { label: 'PACKETS 4.2M/S', color: 'text-zinc-200', dot: 'bg-zinc-200 shadow-[0_0_6px_#d4d4d8]' },
     { label: 'DDOS SHIELD ARMED', color: 'text-theme-700', dot: 'bg-theme-700 shadow-[0_0_6px_var(--color-theme-800)]' },
+    { 
+      label: '🌐 PARTNER AD: FREE 24/7 PLAYIT GLOBAL TUNNELS FOR ALL SERVERS', 
+      color: 'text-cyan-300 font-bold', 
+      dot: 'bg-cyan-400 shadow-[0_0_8px_#06b6d4]',
+      isAd: true,
+      adTag: 'PARTNER AD',
+      adLink: 'https://playit.gg'
+    },
     { label: 'BACKUP SYNCED 04:00 UTC', color: 'text-zinc-300', dot: 'bg-zinc-300 shadow-[0_0_6px_#d4d4d8]' },
     { label: 'US-EAST NOMINAL', color: 'text-theme-500', dot: 'bg-theme-500 shadow-[0_0_6px_var(--color-theme-500)]' },
     { label: 'EU-WEST NOMINAL', color: 'text-theme-500', dot: 'bg-theme-500 shadow-[0_0_6px_var(--color-theme-500)]' },
@@ -283,13 +317,36 @@ export default function Dashboard() {
       <div className="relative z-10">
         
         {/* TICKER */}
-        <div className="border-b border-theme-600/20 bg-zinc-950/70 backdrop-blur-md overflow-hidden flex">
+        <div className="border-b border-theme-600/20 bg-zinc-950/80 backdrop-blur-md overflow-hidden flex">
             <div className="ticker-track">
                 {[...tickerItems, ...tickerItems].map((x, i) => (
-                    <span key={i} className="flex items-center gap-2.5 px-5 py-2.5 font-mono text-[11px] tracking-widest whitespace-nowrap border-r border-theme-600/10">
+                    <div 
+                      key={i} 
+                      className={`flex items-center gap-2.5 px-5 py-2.5 font-mono text-[11px] tracking-widest whitespace-nowrap border-r border-theme-600/10 ${
+                        x.isAd ? 'bg-amber-500/[0.06] hover:bg-amber-500/[0.15] transition-colors cursor-pointer' : ''
+                      }`}
+                    >
                         <span className={`w-1.5 h-1.5 rounded-full ${x.dot}`}></span> 
-                        <span className={`font-semibold ${x.color}`}>{x.label}</span>
-                    </span>
+                        {x.isAd && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)] animate-pulse">
+                            {x.adTag || "AD"}
+                          </span>
+                        )}
+                        {x.isAd && x.adLink ? (
+                          <a
+                            href={x.adLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`font-semibold ${x.color} flex items-center gap-1.5 hover:underline group/ad`}
+                            title="Click to open sponsored ad link"
+                          >
+                            <span>{x.label}</span>
+                            <ExternalLink className="w-3 h-3 text-amber-400 opacity-80 group-hover/ad:opacity-100 group-hover/ad:translate-x-0.5 transition-all" />
+                          </a>
+                        ) : (
+                          <span className={`font-semibold ${x.color}`}>{x.label}</span>
+                        )}
+                    </div>
                 ))}
             </div>
         </div>
@@ -443,18 +500,18 @@ export default function Dashboard() {
                                 <div className="col-span-6 md:col-span-2">
                                     <div className="flex justify-between font-mono text-[10px] tracking-widest mb-1.5">
                                         <span className="text-zinc-400">LOAD</span>
-                                        <span className={s.load > 70 ? 'text-theme-400 font-bold' : s.load > 40 ? 'text-theme-500 font-bold' : 'text-zinc-100 font-bold'}>
+                                        <span className={s.load > 75 ? 'text-red-400 font-bold' : s.load >= 40 ? 'text-amber-400 font-bold' : 'text-emerald-400 font-bold'}>
                                             {s.load}%
                                         </span>
                                     </div>
                                     <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
                                         <div 
                                             className={`loadbar h-full rounded-full ${
-                                                s.load > 70 
-                                                ? 'bg-gradient-to-r from-theme-600 to-theme-400' 
-                                                : s.load > 40 
-                                                ? 'bg-gradient-to-r from-theme-600 to-theme-400' 
-                                                : 'bg-gradient-to-r from-theme-600 to-zinc-100'
+                                                s.load > 75 
+                                                ? 'bg-gradient-to-r from-red-600 to-rose-400 shadow-[0_0_8px_rgba(239,68,68,0.5)]' 
+                                                : s.load >= 40 
+                                                ? 'bg-gradient-to-r from-amber-600 to-yellow-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]' 
+                                                : 'bg-gradient-to-r from-emerald-600 to-green-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
                                             }`} 
                                             style={{ '--w': `${s.load}%` } as React.CSSProperties}
                                         ></div>
@@ -463,8 +520,8 @@ export default function Dashboard() {
                                 <div className="col-span-12 md:col-span-2 flex items-center md:justify-end gap-4">
                                     <div className="text-left md:text-right">
                                         <p className="font-mono text-[10px] text-zinc-400 tracking-widest">UPTIME {s.uptime}%</p>
-                                        <p className={`flex items-center gap-2 font-mono text-[11px] font-bold tracking-widest mt-1 ${ok ? 'text-theme-500' : 'text-theme-400'}`}>
-                                            <span className={`w-2 h-2 ${ok ? 'bg-theme-500 pulse-dot shadow-[0_0_8px_var(--color-theme-500)]' : 'bg-theme-600'} rounded-full`}></span>
+                                        <p className={`flex items-center gap-2 font-mono text-[11px] font-bold tracking-widest mt-1 ${ok ? 'text-red-400' : 'text-blue-400'}`}>
+                                            <span className={`w-2 h-2 ${ok ? 'bg-red-500 pulse-dot shadow-[0_0_8px_rgba(239,68,68,0.8)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]'} rounded-full`}></span>
                                             {s.status}
                                         </p>
                                     </div>
@@ -658,6 +715,9 @@ export default function Dashboard() {
             </div>
         </footer>
       </div>
+
+      {/* Floating Cyberpunk Corner Ad Widget */}
+      <CornerAdWidget />
     </div>
   );
 }
