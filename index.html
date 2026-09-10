@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="red">
+<html lang="en" data-theme="red" data-ui-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -16,7 +16,7 @@
           var b = localStorage.getItem('jtg_button_color');
           if (b) document.documentElement.setAttribute('data-button-color', b);
           var u = localStorage.getItem('jtg_ui_theme');
-          if (u) document.documentElement.setAttribute('data-ui-theme', u);
+          document.documentElement.setAttribute('data-ui-theme', u || 'light');
         } catch(e) {}
       })();
     </script>

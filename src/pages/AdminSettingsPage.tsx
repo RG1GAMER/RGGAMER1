@@ -770,16 +770,16 @@ export default function AdminSettingsPage(): React.ReactElement {
                                   backgroundColor: uiTheme === 'light' ? '#f4f4f6' : (uiTheme === 'black' ? '#000000' : (uiTheme === 'navy' ? '#0b1329' : (uiTheme === 'slate' ? '#1e293b' : (uiTheme === 'purple' ? '#140c2b' : (uiTheme === 'emerald' ? '#07261b' : (uiTheme === 'crimson' ? '#26070c' : (uiTheme === 'amber' ? '#241808' : '#121217'))))))),
                                 }} 
                               />
-                              <span className="capitalize font-semibold">{uiTheme || 'dark'} UI</span>
+                              <span className="capitalize font-semibold">{uiTheme || 'light'} UI</span>
                             </span>
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 relative z-10">
                           {[
-                            { id: "dark", label: "Dark Onyx (Default)", desc: "Modern deep charcoal dark theme", bg: "#09090b", card: "#121217", text: "#ffffff", border: "rgba(255,255,255,0.1)" },
+                            { id: "light", label: "Clean Studio White (Default)", desc: "Pure crisp white & light surface theme", bg: "#f4f4f6", card: "#ffffff", text: "#09090b", border: "rgba(0,0,0,0.12)" },
+                            { id: "dark", label: "Dark Onyx", desc: "Modern deep charcoal dark theme", bg: "#09090b", card: "#121217", text: "#ffffff", border: "rgba(255,255,255,0.1)" },
                             { id: "black", label: "Obsidian OLED Black", desc: "Pitch black background with crisp onyx cards", bg: "#000000", card: "#09090b", text: "#ffffff", border: "rgba(255,255,255,0.15)" },
-                            { id: "light", label: "Clean Studio Light", desc: "Pure crisp white & light surface theme", bg: "#f4f4f6", card: "#ffffff", text: "#09090b", border: "rgba(0,0,0,0.12)" },
                             { id: "navy", label: "Cyber Midnight Navy", desc: "Deep oceanic blue dark interface", bg: "#020617", card: "#0b1329", text: "#f8fafc", border: "rgba(59,130,246,0.25)" },
                             { id: "slate", label: "Slate Gunmetal", desc: "Refined zinc and metallic slate dark", bg: "#0f172a", card: "#1e293b", text: "#f1f5f9", border: "rgba(148,163,184,0.25)" },
                             { id: "purple", label: "Royal Deep Violet", desc: "Atmospheric neon purple night", bg: "#080414", card: "#140c2b", text: "#faf5ff", border: "rgba(168,85,247,0.25)" },
@@ -787,7 +787,7 @@ export default function AdminSettingsPage(): React.ReactElement {
                             { id: "crimson", label: "Crimson Blood Dark", desc: "Intense dark ruby wine interface", bg: "#140305", card: "#26070c", text: "#fff1f2", border: "rgba(244,63,94,0.25)" },
                             { id: "amber", label: "Espresso Amber Dark", desc: "Warm gold & roasted coffee dark theme", bg: "#120c04", card: "#241808", text: "#fffbeb", border: "rgba(245,158,11,0.25)" },
                           ].map((themeOption) => {
-                            const isSelected = (uiTheme || 'dark') === themeOption.id;
+                            const isSelected = (uiTheme || 'light') === themeOption.id;
                             return (
                               <button
                                 key={themeOption.id}

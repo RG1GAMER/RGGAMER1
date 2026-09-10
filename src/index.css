@@ -2,46 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
-:root, [data-ui-theme="dark"] {
-  --bg-background: #09090b;
-  --bg-card: #121217;
-  
-  --text-foreground: #ffffff;
-  --text-foreground-muted: #e4e4e7;
-  --text-muted-foreground: #a1a1aa;
-  
-  --border-border: rgba(255, 255, 255, 0.1);
-  --border-border-subtle: rgba(255, 255, 255, 0.05);
-  --border-border-strong: rgba(255, 255, 255, 0.2);
-  
-  --bg-muted: rgba(255, 255, 255, 0.06);
-  --bg-muted-hover: rgba(255, 255, 255, 0.12);
-  --bg-muted-subtle: rgba(255, 255, 255, 0.03);
-
-  --btn-primary-bg: #ffffff;
-  --btn-primary-text: #000000;
-}
-
-[data-ui-theme="black"] {
-  --bg-background: #000000;
-  --bg-card: #000000;
-  
-  --text-foreground: #ffffff;
-  --text-foreground-muted: #e4e4e7;
-  --text-muted-foreground: #a1a1aa;
-  
-  --border-border: rgba(255, 255, 255, 0.16);
-  --border-border-subtle: rgba(255, 255, 255, 0.08);
-  --border-border-strong: rgba(255, 255, 255, 0.3);
-  
-  --bg-muted: #050507;
-  --bg-muted-hover: #121216;
-  --bg-muted-subtle: #000000;
-
-  --btn-primary-bg: #ffffff;
-  --btn-primary-text: #000000;
-}
-
+:root,
 [data-ui-theme="light"],
 [data-ui-theme="white"] {
   --bg-background: #f4f4f6;
@@ -61,6 +22,26 @@
 
   --btn-primary-bg: #09090b;
   --btn-primary-text: #ffffff;
+}
+
+[data-ui-theme="dark"] {
+  --bg-background: #09090b;
+  --bg-card: #121217;
+  
+  --text-foreground: #ffffff;
+  --text-foreground-muted: #e4e4e7;
+  --text-muted-foreground: #a1a1aa;
+  
+  --border-border: rgba(255, 255, 255, 0.1);
+  --border-border-subtle: rgba(255, 255, 255, 0.05);
+  --border-border-strong: rgba(255, 255, 255, 0.2);
+  
+  --bg-muted: rgba(255, 255, 255, 0.06);
+  --bg-muted-hover: rgba(255, 255, 255, 0.12);
+  --bg-muted-subtle: rgba(255, 255, 255, 0.03);
+
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #000000;
 }
 
 [data-ui-theme="navy"] {

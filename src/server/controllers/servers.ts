@@ -2820,3 +2820,381 @@ export const restoreBackup = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message || "Failed to restore backup" });
   }
 };
+
+export const uploadPluginZip = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) {
+      return res.status(400).json({ error: "No ZIP file uploaded" });
+    }
+    const uploadedPath = req.file.path;
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    const pluginsDir = path.join(serverDir, "plugins");
+    await fs.ensureDir(pluginsDir);
+
+    const tempExtractDir = path.join(process.cwd(), ".data", "temp", `plugins_zip_${Date.now()}`);
+    await fs.ensureDir(tempExtractDir);
+    await extractArchive(uploadedPath, tempExtractDir);
+
+    const installedJars: string[] = [];
+    const findJars = async (dir: string) => {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await findJars(full);
+        } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".jar")) {
+          const dest = path.join(pluginsDir, entry.name);
+          await fs.copy(full, dest, { overwrite: true });
+          installedJars.push(entry.name);
+        }
+      }
+    };
+    await findJars(tempExtractDir);
+
+    const topEntries = await fs.readdir(tempExtractDir, { withFileTypes: true });
+    for (const top of topEntries) {
+      if (top.isDirectory() && top.name.toLowerCase() !== "__macosx") {
+        const destFolder = path.join(pluginsDir, top.name);
+        await fs.copy(path.join(tempExtractDir, top.name), destFolder, { overwrite: true }).catch(() => {});
+      }
+    }
+
+    await fs.remove(tempExtractDir).catch(() => {});
+    await fs.remove(uploadedPath).catch(() => {});
+
+    if (installedJars.length === 0) {
+      return res.status(400).json({ error: "Uploaded ZIP file did not contain any .jar plugin files." });
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully extracted and installed ${installedJars.length} plugins from ZIP archive!`,
+      installedPlugins: installedJars
+    });
+  } catch (err: any) {
+    console.error("Plugin ZIP upload error:", err);
+    res.status(500).json({ error: err.message || "Failed to process plugin ZIP archive." });
+  }
+};
+
+const DEFAULT_PLUGIN_PACKS = [
+  {
+    id: "pack_survival_essentials",
+    name: "Survival Essentials Pack",
+    description: "Must-have plugins for any survival server: commands, homes, economy, permissions, and world protection.",
+    picture: "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
+    author: "JTG Essentials",
+    isPreset: true,
+    plugins: [
+      { name: "EssentialsX", source: "spigot", id: "essentialsx" },
+      { name: "WorldEdit", source: "modrinth", id: "worldedit" },
+      { name: "LuckPerms", source: "modrinth", id: "luckperms" },
+      { name: "Vault", source: "spigot", id: "vault" },
+      { name: "CoreProtect", source: "spigot", id: "coreprotect" },
+      { name: "Chunky", source: "modrinth", id: "chunky" }
+    ]
+  },
+  {
+    id: "pack_bedrock_crossplay",
+    name: "Bedrock Crossplay Pack (Geyser)",
+    description: "Allow players on Bedrock Edition (Android, iOS, Xbox, PS4/5, Nintendo Switch) to join your Java server seamlessly.",
+    picture: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80",
+    author: "GeyserMC Team",
+    isPreset: true,
+    plugins: [
+      { name: "Geyser-Spigot", source: "modrinth", id: "geyser" },
+      { name: "Floodgate", source: "modrinth", id: "floodgate" },
+      { name: "ViaVersion", source: "modrinth", id: "viaversion" },
+      { name: "ViaBackwards", source: "modrinth", id: "viabackwards" }
+    ]
+  },
+  {
+    id: "pack_economy_shops",
+    name: "Economy & Player Shops",
+    description: "Complete economy infrastructure with virtual currency, chest shops, auction houses, and floating holographic scoreboards.",
+    picture: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80",
+    author: "Marketplace Suite",
+    isPreset: true,
+    plugins: [
+      { name: "Vault", source: "spigot", id: "vault" },
+      { name: "EssentialsX", source: "spigot", id: "essentialsx" },
+      { name: "DecentHolograms", source: "spigot", id: "decentholograms" },
+      { name: "TAB", source: "modrinth", id: "tab" }
+    ]
+  },
+  {
+    id: "pack_security_antigrief",
+    name: "Security & Anti-Grief Defense",
+    description: "Complete protection against griefers, block stealing, server lag, inventory theft, and unauthorized player joins.",
+    picture: "https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=80",
+    author: "Security Guard",
+    isPreset: true,
+    plugins: [
+      { name: "CoreProtect", source: "spigot", id: "coreprotect" },
+      { name: "LuckPerms", source: "modrinth", id: "luckperms" },
+      { name: "ClearLag", source: "bukkit", id: "clearlag" }
+    ]
+  },
+  {
+    id: "pack_hub_minigames",
+    name: "Hub, Lobbies & Holograms",
+    description: "Create an attractive multiplayer lobby with custom floating text, custom player tablists, and world managers.",
+    picture: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80",
+    author: "Hub Masters",
+    isPreset: true,
+    plugins: [
+      { name: "DecentHolograms", source: "spigot", id: "decentholograms" },
+      { name: "TAB", source: "modrinth", id: "tab" },
+      { name: "WorldEdit", source: "modrinth", id: "worldedit" }
+    ]
+  }
+];
+
+export const getPluginPacks = async (req: Request, res: Response) => {
+  try {
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    let customPacks: any[] = [];
+    if (await fs.pathExists(packsFile)) {
+      try {
+        customPacks = await fs.readJSON(packsFile);
+      } catch {}
+    }
+    const customIds = new Set(customPacks.map(p => p.id));
+    const presets = DEFAULT_PLUGIN_PACKS.filter(p => !customIds.has(p.id));
+    const combined = [...presets, ...customPacks];
+    res.json(combined);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to fetch plugin packs" });
+  }
+};
+
+export const createPluginPack = async (req: Request, res: Response) => {
+  try {
+    const { name, description, picture, plugins } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: "Pack name is required" });
+    }
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    await fs.ensureFile(packsFile);
+    let customPacks: any[] = [];
+    try {
+      customPacks = await fs.readJSON(packsFile);
+    } catch {}
+
+    const newPack = {
+      id: `pack_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name,
+      description: description || "",
+      picture: picture || "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
+      author: (req as any).user?.username || "Admin",
+      isPreset: false,
+      plugins: Array.isArray(plugins) ? plugins : []
+    };
+
+    customPacks.push(newPack);
+    await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+    res.json({ success: true, pack: newPack });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to create plugin pack" });
+  }
+};
+
+export const updatePluginPack = async (req: Request, res: Response) => {
+  try {
+    const { packId } = req.params;
+    const { name, description, picture, plugins, author } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "Pack name cannot be empty" });
+    }
+
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    await fs.ensureFile(packsFile);
+    let customPacks: any[] = [];
+    try {
+      if (await fs.pathExists(packsFile)) {
+        customPacks = await fs.readJSON(packsFile);
+      }
+    } catch {}
+
+    const existingIdx = customPacks.findIndex(p => p.id === packId);
+    let updatedPack: any;
+
+    if (existingIdx !== -1) {
+      updatedPack = {
+        ...customPacks[existingIdx],
+        name: name.trim(),
+        description: description !== undefined ? description.trim() : customPacks[existingIdx].description,
+        picture: picture !== undefined && picture.trim() ? picture.trim() : customPacks[existingIdx].picture,
+        plugins: Array.isArray(plugins) ? plugins : customPacks[existingIdx].plugins,
+        updatedAt: new Date().toISOString()
+      };
+      customPacks[existingIdx] = updatedPack;
+    } else {
+      const defaultPreset = DEFAULT_PLUGIN_PACKS.find(p => p.id === packId);
+      if (defaultPreset) {
+        updatedPack = {
+          ...defaultPreset,
+          name: name.trim(),
+          description: description !== undefined ? description.trim() : defaultPreset.description,
+          picture: picture !== undefined && picture.trim() ? picture.trim() : defaultPreset.picture,
+          plugins: Array.isArray(plugins) ? plugins : defaultPreset.plugins,
+          isPreset: false,
+          author: author || (req as any).user?.username || defaultPreset.author,
+          updatedAt: new Date().toISOString()
+        };
+        customPacks.push(updatedPack);
+      } else {
+        updatedPack = {
+          id: packId,
+          name: name.trim(),
+          description: description ? description.trim() : "",
+          picture: picture && picture.trim() ? picture.trim() : "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
+          author: author || (req as any).user?.username || "Admin",
+          isPreset: false,
+          plugins: Array.isArray(plugins) ? plugins : [],
+          updatedAt: new Date().toISOString()
+        };
+        customPacks.push(updatedPack);
+      }
+    }
+
+    await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+    res.json({
+      success: true,
+      message: `Plugin pack "${updatedPack.name}" saved successfully!`,
+      pack: updatedPack
+    });
+  } catch (err: any) {
+    console.error("Update plugin pack error:", err);
+    res.status(500).json({ error: err.message || "Failed to save plugin pack" });
+  }
+};
+
+export const deletePluginPack = async (req: Request, res: Response) => {
+  try {
+    const { packId } = req.params;
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    if (!await fs.pathExists(packsFile)) {
+      return res.status(404).json({ error: "No custom packs found" });
+    }
+    let customPacks: any[] = await fs.readJSON(packsFile);
+    const prevLen = customPacks.length;
+    customPacks = customPacks.filter(p => p.id !== packId);
+    if (customPacks.length === prevLen) {
+      return res.status(404).json({ error: "Pack not found or cannot delete preset packs" });
+    }
+    await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || "Failed to delete plugin pack" });
+  }
+};
+
+export const installPluginPack = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { packId, plugins } = req.body;
+    const serverDir = path.join(process.cwd(), ".data", "servers", id);
+    const pluginsDir = path.join(serverDir, "plugins");
+    await fs.ensureDir(pluginsDir);
+
+    let pluginsToInstall = plugins;
+    if (!pluginsToInstall || !Array.isArray(pluginsToInstall)) {
+      const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+      let allPacks = [...DEFAULT_PLUGIN_PACKS];
+      if (await fs.pathExists(packsFile)) {
+        try {
+          const custom = await fs.readJSON(packsFile);
+          allPacks = [...allPacks, ...custom];
+        } catch {}
+      }
+      const found = allPacks.find(p => p.id === packId);
+      if (!found) {
+        return res.status(404).json({ error: "Plugin pack not found" });
+      }
+      pluginsToInstall = found.plugins;
+    }
+
+    const results: { name: string; success: boolean; error?: string }[] = [];
+    const axios = (await import("axios")).default;
+    const commonHeaders = {
+      'User-Agent': 'JTGPanel/3.1.0 (https://github.com/jishnu; support@jtgpanel.net)'
+    };
+
+    for (const plugin of pluginsToInstall) {
+      const pName = typeof plugin === 'string' ? plugin : plugin.name;
+      try {
+        const mrSearch: any = await axios.get(`https://api.modrinth.com/v2/search?query=${encodeURIComponent(pName)}&facets=[["project_type:plugin"]]&limit=1`, {
+          headers: commonHeaders,
+          timeout: 6000
+        }).catch(() => null);
+
+        let dlUrl = null;
+        let finalFilename = `${pName.replace(/[^a-zA-Z0-9]/g, '_')}.jar`;
+
+        if (mrSearch && mrSearch.data && mrSearch.data.hits && mrSearch.data.hits.length > 0) {
+          const hit = mrSearch.data.hits[0];
+          const verRes: any = await axios.get(`https://api.modrinth.com/v2/project/${hit.project_id}/version`, {
+            headers: commonHeaders,
+            timeout: 6000
+          }).catch(() => null);
+          if (verRes && verRes.data && verRes.data.length > 0) {
+            const latestVer = verRes.data[0];
+            const jarFile = latestVer.files?.find((f: any) => f.filename?.endsWith('.jar') && (f.primary || true));
+            if (jarFile?.url) {
+              dlUrl = jarFile.url;
+              finalFilename = jarFile.filename || finalFilename;
+            }
+          }
+        }
+
+        if (dlUrl) {
+          const fileDest = path.join(pluginsDir, finalFilename);
+          const dlRes = await axios({ url: dlUrl, method: 'GET', responseType: 'stream', timeout: 15000 });
+          const writer = fs.createWriteStream(fileDest);
+          dlRes.data.pipe(writer);
+          await new Promise<void>((resolve, reject) => { writer.on('finish', resolve); writer.on('error', reject); });
+          results.push({ name: pName, success: true });
+        } else {
+          // Check PaperMC Hangar
+          const hangarSearch = await axios.get(`https://hangar.papermc.io/api/v1/projects?q=${encodeURIComponent(pName)}&limit=1`, {
+            headers: commonHeaders,
+            timeout: 6000
+          }).catch(() => null);
+          const hProject = hangarSearch?.data?.result?.[0];
+          if (hProject) {
+            const hVer = await axios.get(`https://hangar.papermc.io/api/v1/projects/${hProject.name}/versions?limit=1`, {
+              headers: commonHeaders,
+              timeout: 6000
+            }).catch(() => null);
+            const latestVer = hVer?.data?.result?.[0];
+            const platformDl = latestVer?.downloads?.PAPER || latestVer?.downloads?.WATERFALL || latestVer?.downloads?.VELOCITY;
+            if (platformDl?.downloadUrl) {
+              const fileDest = path.join(pluginsDir, `${hProject.name}.jar`);
+              const dlRes = await axios({ url: platformDl.downloadUrl, method: 'GET', responseType: 'stream', timeout: 15000 });
+              const writer = fs.createWriteStream(fileDest);
+              dlRes.data.pipe(writer);
+              await new Promise<void>((resolve, reject) => { writer.on('finish', resolve); writer.on('error', reject); });
+              results.push({ name: pName, success: true });
+              continue;
+            }
+          }
+          results.push({ name: pName, success: false, error: "Download link not found automatically" });
+        }
+      } catch (err: any) {
+        results.push({ name: pName, success: false, error: err.message || "Failed to download" });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    res.json({
+      success: true,
+      message: `Installed ${successCount} of ${pluginsToInstall.length} plugins from pack!`,
+      results
+    });
+  } catch (err: any) {
+    console.error("Install pack error:", err);
+    res.status(500).json({ error: err.message || "Failed to install plugin pack" });
+  }
+};

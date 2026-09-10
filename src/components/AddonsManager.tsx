@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import axios from "axios";
+import SearchQueueBar from "./SearchQueueBar";
 import { 
   Puzzle, 
   Box, 
@@ -26,7 +27,9 @@ import {
   FileCode,
   ShieldAlert,
   ArrowDownToLine,
-  Power
+  Power,
+  PanelLeft,
+  PanelLeftClose
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -299,6 +302,7 @@ export default function AddonsManager({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [statusToast, setStatusToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [lastInstalledName, setLastInstalledName] = useState<string | null>(null);
 
   // Installed Items State
   const [installedList, setInstalledList] = useState<InstalledItem[]>([]);
@@ -316,6 +320,24 @@ export default function AddonsManager({
     required: false
   });
   const [isSavingProps, setIsSavingProps] = useState<boolean>(false);
+
+  // Dedicated side queue panel toggle state
+  const [isSideQueueOpen, setIsSideQueueOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem("jtg_addons_side_queue");
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleSideQueue = () => {
+    setIsSideQueueOpen(prev => {
+      const next = !prev;
+      try { localStorage.setItem("jtg_addons_side_queue", String(next)); } catch {}
+      return next;
+    });
+  };
   const [showPropsConfig, setShowPropsConfig] = useState<boolean>(false);
 
   // Detail Modal / Drawer State
@@ -545,6 +567,7 @@ export default function AddonsManager({
       }
 
       triggerToast(`Installed ${item.name} successfully!`, "success");
+      setLastInstalledName(item.name);
       await fetchInstalled();
     } catch (err: any) {
       triggerToast(err.response?.data?.error || err.message || `Failed to install ${item.name}`, "error");
@@ -646,95 +669,56 @@ export default function AddonsManager({
       )}
 
       {/* CATEGORY TABS BAR */}
-      <div className="flex items-center gap-2 overflow-x-auto py-1 custom-scrollbar shrink-0">
-        {[
-          { key: "all", label: "All Add-ons", icon: Globe, count: null },
-          { key: "mods", label: "Mods", icon: Box, count: null },
-          { key: "datapacks", label: "Datapacks", icon: Layers, count: null },
-          { key: "resourcepacks", label: "Resource Packs", icon: Palette, count: null },
-          { key: "installed", label: "Installed", icon: HardDrive, count: installedList.filter(p => p.type !== "plugin").length },
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isSelected = selectedCategory === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setSelectedCategory(tab.key as AddonCategory)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all whitespace-nowrap border shrink-0 ${
-                isSelected
-                  ? "bg-theme-600 text-white border-theme-500 shadow-md shadow-theme-600/30"
-                  : "bg-zinc-950/90 text-slate-300 hover:text-white border-white/15 hover:border-white/30"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-              {tab.count !== null && (
-                <span className={`px-2 py-0.5 text-[11px] rounded-full font-mono ${
-                  isSelected ? "bg-white/20 text-white" : "bg-zinc-800 text-slate-300"
-                }`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* SEARCH, SOURCE PROVIDER & VERSION FILTER */}
-      {selectedCategory !== "installed" && (
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          {/* Search Box */}
-          <div className="md:col-span-8 relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder={`Search ${selectedCategory === "all" ? "mods, datapacks, resource packs..." : selectedCategory}...`}
-              className="w-full bg-zinc-950/80 border border-white/15 focus:border-theme-500 rounded-xl pl-10 pr-9 py-2.5 text-xs sm:text-sm text-white font-mono outline-none transition-all"
-            />
-            {searchQuery && (
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto py-1 custom-scrollbar shrink-0">
+          {[
+            { key: "all", label: "All Add-ons", icon: Globe, count: null },
+            { key: "mods", label: "Mods", icon: Box, count: null },
+            { key: "datapacks", label: "Datapacks", icon: Layers, count: null },
+            { key: "resourcepacks", label: "Resource Packs", icon: Palette, count: null },
+            { key: "installed", label: "Installed", icon: HardDrive, count: installedList.filter(p => p.type !== "plugin").length },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isSelected = selectedCategory === tab.key;
+            return (
               <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5"
+                key={tab.key}
+                onClick={() => setSelectedCategory(tab.key as AddonCategory)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono font-bold transition-all whitespace-nowrap border shrink-0 ${
+                  isSelected
+                    ? "bg-theme-600 text-white border-theme-500 shadow-md shadow-theme-600/30"
+                    : "bg-zinc-950/90 text-slate-300 hover:text-white border-white/15 hover:border-white/30"
+                }`}
               >
-                <X className="w-3.5 h-3.5" />
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+                {tab.count !== null && (
+                  <span className={`px-2 py-0.5 text-[11px] rounded-full font-mono ${
+                    isSelected ? "bg-white/20 text-white" : "bg-zinc-800 text-slate-300"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
               </button>
-            )}
-          </div>
-
-          {/* Version Filter */}
-          <div className="md:col-span-4">
-            <select
-              value={selectedVersion}
-              onChange={e => setSelectedVersion(e.target.value)}
-              className="w-full bg-zinc-950/80 border border-white/15 focus:border-theme-500 rounded-xl px-3 py-2.5 text-xs sm:text-sm text-white font-mono outline-none cursor-pointer"
-            >
-              {MC_VERSIONS.map(v => (
-                <option key={v} value={v} className="bg-zinc-950 text-white">
-                  {v}
-                </option>
-              ))}
-            </select>
-          </div>
+            );
+          })}
         </div>
-      )}
 
-      {/* POPULAR QUICK-SEARCH TAGS */}
-      {selectedCategory !== "installed" && POPULAR_TAGS[selectedCategory] && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs font-mono custom-scrollbar">
-          <span className="text-slate-500 font-bold shrink-0">Popular:</span>
-          {POPULAR_TAGS[selectedCategory].map(tag => (
-            <button
-              key={tag}
-              onClick={() => setSearchQuery(tag)}
-              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5 hover:border-white/20 transition-all shrink-0 active:scale-95"
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
+        {selectedCategory !== "installed" && (
+          <button
+            onClick={toggleSideQueue}
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 border cursor-pointer shrink-0 ${
+              isSideQueueOpen
+                ? "bg-zinc-900 border-white/15 text-slate-200"
+                : "bg-theme-500/15 border-theme-500/30 text-theme-400"
+            }`}
+            title={isSideQueueOpen ? "Hide Side Queue" : "Show Side Queue"}
+          >
+            {isSideQueueOpen ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeft className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{isSideQueueOpen ? "Side Queue" : "Open Queue"}</span>
+          </button>
+        )}
+      </div>
 
       {/* CONTENT VIEW: INSTALLED OR BROWSER */}
       {selectedCategory === "installed" ? (
@@ -1018,9 +1002,104 @@ export default function AddonsManager({
           })()}
         </div>
       ) : (
-        /* EXPLORE & DISCOVER ADD-ONS GRID */
-        <div className="space-y-4">
-          {isLoading ? (
+        /* EXPLORE & DISCOVER ADD-ONS WITH SIDE QUEUE & MIDDLE SEARCH */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* SIDE COLUMN: AUTO SEARCH QUEUE */}
+          {isSideQueueOpen && (
+            <div className="lg:col-span-4 xl:col-span-4">
+              <SearchQueueBar
+                storageKey={`addons_${selectedCategory}_${serverId}`}
+                title={`${selectedCategory === "all" ? "Add-ons" : selectedCategory === "mods" ? "Mods" : selectedCategory === "datapacks" ? "Datapacks" : "Resource Packs"} Auto Search`}
+                itemTypeLabel={selectedCategory === "all" ? "item" : selectedCategory}
+                layout="sidebar"
+                onSearchItem={(term) => {
+                  setSearchQuery(term);
+                }}
+                currentQuery={searchQuery}
+                lastInstalledName={lastInstalledName}
+                onToggleCollapse={toggleSideQueue}
+              />
+            </div>
+          )}
+
+          {/* MIDDLE COLUMN: MAIN SEARCH BAR & EXPLORE GRID */}
+          <div className={`${isSideQueueOpen ? "lg:col-span-8 xl:col-span-8" : "lg:col-span-12"} space-y-4`}>
+            {/* SEARCH & VERSION FILTER (MIDDLE SEARCH BAR) */}
+            <div className="bg-card border border-border rounded-3xl p-5 shadow-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-foreground uppercase tracking-wider">
+                  <Search className="w-4 h-4 text-theme-500" />
+                  <span>Search {selectedCategory === "all" ? "Add-ons" : selectedCategory}</span>
+                </div>
+                {!isSideQueueOpen && (
+                  <button
+                    onClick={toggleSideQueue}
+                    className="px-2.5 py-1 rounded-xl bg-muted border border-border hover:bg-muted-hover text-foreground text-xs font-mono font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <PanelLeft className="w-3.5 h-3.5 text-theme-500" />
+                    <span>Show Side Queue</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                {/* Search Box */}
+                <div className="md:col-span-8 relative">
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder={`Search ${selectedCategory === "all" ? "mods, datapacks, resource packs..." : selectedCategory}...`}
+                    className="w-full bg-muted border border-border focus:border-theme-500 rounded-2xl pl-10 pr-9 py-2.5 text-xs sm:text-sm text-foreground font-mono outline-none transition-all placeholder:text-muted-foreground"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
+                      title="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Version Filter */}
+                <div className="md:col-span-4">
+                  <select
+                    value={selectedVersion}
+                    onChange={e => setSelectedVersion(e.target.value)}
+                    className="w-full bg-muted border border-border focus:border-theme-500 rounded-2xl px-3 py-2.5 text-xs sm:text-sm text-foreground font-mono outline-none cursor-pointer"
+                  >
+                    {MC_VERSIONS.map(v => (
+                      <option key={v} value={v} className="bg-card text-foreground">
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* POPULAR QUICK-SEARCH TAGS */}
+              {POPULAR_TAGS[selectedCategory] && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5 text-xs font-mono custom-scrollbar">
+                  <span className="text-muted-foreground font-bold shrink-0">Popular:</span>
+                  {POPULAR_TAGS[selectedCategory].map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setSearchQuery(tag)}
+                      className="px-2.5 py-1 rounded-lg bg-muted hover:bg-muted-hover text-foreground/80 hover:text-foreground border border-border transition-all shrink-0 active:scale-95 cursor-pointer"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* EXPLORE & DISCOVER ADD-ONS GRID */}
+            <div className="space-y-4">
+              {isLoading ? (
             <div className="p-16 text-center font-mono text-sm text-slate-400 flex flex-col items-center gap-3">
               <RefreshCw className="w-7 h-7 animate-spin text-theme-400" />
               <span>Fetching add-ons from Modrinth & Paper Hangar...</span>
@@ -1143,6 +1222,8 @@ export default function AddonsManager({
               })}
             </div>
           )}
+            </div>
+          </div>
         </div>
       )}
 

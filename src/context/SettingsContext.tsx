@@ -18,7 +18,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   const [enableRegistration, setEnableRegistration] = useState<boolean>(true);
   const [theme, setThemeState] = useState<string>(() => localStorage.getItem("jtg_theme") || "red");
   const [buttonColor, setButtonColorState] = useState<string>(() => localStorage.getItem("jtg_button_color") || "theme");
-  const [uiTheme, setUiThemeState] = useState<string>(() => localStorage.getItem("jtg_ui_theme") || "dark");
+  const [uiTheme, setUiThemeState] = useState<string>(() => localStorage.getItem("jtg_ui_theme") || "light");
   const [enableGoogleLogin, setEnableGoogleLogin] = useState<boolean>(false);
   const [firebaseApiKey, setFirebaseApiKey] = useState<string>("");
   const [firebaseAuthDomain, setFirebaseAuthDomain] = useState<string>("");
@@ -62,7 +62,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   const setUiTheme = useCallback((val: string, syncToServer = false) => {
-    const finalVal = val || "dark";
+    const finalVal = val || "light";
     setUiThemeState(finalVal);
     try {
       localStorage.setItem("jtg_ui_theme", finalVal);
@@ -132,7 +132,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
     // Synchronously apply initial theme attributes immediately
     document.documentElement.setAttribute("data-theme", theme || "red");
     document.documentElement.setAttribute("data-button-color", buttonColor || "theme");
-    document.documentElement.setAttribute("data-ui-theme", uiTheme || "dark");
+    document.documentElement.setAttribute("data-ui-theme", uiTheme || "light");
 
     fetchSettings();
     const token = localStorage.getItem("jtg_token") || localStorage.getItem("token");
@@ -161,7 +161,7 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   }, [buttonColor]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-ui-theme", uiTheme || "dark");
+    document.documentElement.setAttribute("data-ui-theme", uiTheme || "light");
   }, [uiTheme]);
 
   useEffect(() => {

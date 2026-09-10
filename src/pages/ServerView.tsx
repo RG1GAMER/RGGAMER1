@@ -276,22 +276,8 @@ export default function ServerView() {
   }
 
   const navTabs: any[] = [
-    { name: "Overview", path: `/`, exactPath: "overview", icon: <LayoutDashboard size={18} /> },
-    { name: "All Servers", path: `/servers`, exactPath: "servers", icon: <ServerIcon size={18} /> },
-    { name: "Deploy Server", path: `/servers/create`, exactPath: "create", icon: <Plus size={18} /> },
+    { name: "Back to Dashboard", path: `/`, exactPath: "dashboard", icon: <LayoutDashboard size={18} /> },
   ];
-
-  if (user?.role === "admin" || user?.role === "owner") {
-    navTabs.push(
-      { name: "Fleet", path: `/admin/servers`, exactPath: "fleet", icon: <Box size={18} /> },
-      { name: "Nodes", path: `/nodes`, exactPath: "nodes", icon: <Cpu size={18} /> },
-      { name: "Admin Settings", path: `/admin/settings`, exactPath: "admin", icon: <Settings size={18} /> }
-    );
-  }
-
-  navTabs.push(
-    { name: "Account", path: `/account`, exactPath: "account", icon: <Users size={18} /> }
-  );
 
   return (
     <motion.div 
@@ -465,12 +451,12 @@ export default function ServerView() {
                 key={tab.name}
                 to={tab.path}
                 onClick={() => setSidebarOpen(false)}
-                className="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium transition-all rounded-lg text-muted-foreground hover:text-foreground-muted hover:bg-white/[0.05] border border-transparent"
+                className="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium transition-all rounded-lg text-muted-foreground hover:text-foreground hover:bg-theme-500/10 hover:border-theme-500/25 border border-transparent group active:scale-[0.98]"
               >
-                <div className="text-muted-foreground transition-colors">
+                <div className="text-muted-foreground group-hover:text-theme-400 transition-colors">
                   {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
                 </div>
-                <span>{tab.name}</span>
+                <span className="group-hover:text-foreground transition-colors">{tab.name}</span>
               </Link>
             );
           })}

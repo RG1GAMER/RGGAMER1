@@ -18,7 +18,7 @@ import {
   saveResourcePackSettings
 } from "../controllers/world.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, uploadExternalBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar } from "../controllers/servers.js";
+import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, uploadExternalBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar, uploadPluginZip, getPluginPacks, createPluginPack, updatePluginPack, deletePluginPack, installPluginPack } from "../controllers/servers.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -812,6 +812,13 @@ router.delete("/:id/sftp", async (req, res) => {
 });
 
 router.post("/:id/plugins/install", installPlugin);
+router.post("/:id/plugins/upload-zip", upload.single("file") as any, handleUploadError, uploadPluginZip);
+router.get("/:id/plugins/packs", getPluginPacks);
+router.post("/:id/plugins/packs", createPluginPack);
+router.put("/:id/plugins/packs/:packId", updatePluginPack);
+router.post("/:id/plugins/packs/:packId/save", updatePluginPack);
+router.delete("/:id/plugins/packs/:packId", deletePluginPack);
+router.post("/:id/plugins/install-pack", installPluginPack);
 router.post("/:id/mods/install", installMod);
 router.post("/:id/resourcepacks/install", installResourcePack);
 router.post("/:id/datapacks/install", installDatapack);

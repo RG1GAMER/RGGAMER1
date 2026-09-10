@@ -69,7 +69,7 @@ router.get("/settings", async (req, res) => {
     enableRegistration: settings.enableRegistration !== undefined ? settings.enableRegistration : true,
     theme: settings.theme || "red",
     buttonColor: settings.buttonColor || "theme",
-    uiTheme: settings.uiTheme || "dark",
+    uiTheme: settings.uiTheme || "light",
     enableGoogleLogin: settings.enableGoogleLogin !== undefined ? settings.enableGoogleLogin : false,
     firebaseApiKey: settings.firebaseApiKey || "",
     firebaseAuthDomain: settings.firebaseAuthDomain || "",
