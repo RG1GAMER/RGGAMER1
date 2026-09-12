@@ -25,6 +25,13 @@ import {
   Save,
   Edit3,
   Puzzle,
+  Globe,
+  Lock,
+  Unlock,
+  Share2,
+  Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export interface PluginPackItem {
@@ -34,6 +41,10 @@ export interface PluginPackItem {
   picture: string;
   author: string;
   isPreset?: boolean;
+  isPrivate?: boolean;
+  visibility?: "public" | "private";
+  isGlobal?: boolean;
+  shareCode?: string;
   plugins: Array<{ name: string; source?: string; id?: string }>;
 }
 
@@ -74,7 +85,17 @@ export default function PluginPackView({
   const [newPackDesc, setNewPackDesc] = useState<string>("");
   const [newPackPicture, setNewPackPicture] = useState<string>(PRESET_PICTURES[0].url);
   const [newPackPluginsInput, setNewPackPluginsInput] = useState<string>("");
+  const [newPackVisibility, setNewPackVisibility] = useState<"public" | "private">("public");
   const [isCreating, setIsCreating] = useState<boolean>(false);
+
+  // Filter tab state
+  const [packCategoryFilter, setPackCategoryFilter] = useState<"all" | "global" | "private" | "custom" | "presets">("all");
+
+  // Import pack modal state
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [importShareCode, setImportShareCode] = useState<string>("");
+  const [importJsonPayload, setImportJsonPayload] = useState<string>("");
+  const [isImporting, setIsImporting] = useState<boolean>(false);
 
   // ZIP upload modal state
   const [isZipModalOpen, setIsZipModalOpen] = useState<boolean>(false);
@@ -93,6 +114,7 @@ export default function PluginPackView({
   const [editPackName, setEditPackName] = useState<string>("");
   const [editPackDesc, setEditPackDesc] = useState<string>("");
   const [editPackPicture, setEditPackPicture] = useState<string>("");
+  const [editPackVisibility, setEditPackVisibility] = useState<"public" | "private">("public");
   const [editPackPlugins, setEditPackPlugins] = useState<Array<{ name: string; source?: string; id?: string }>>([]);
   const [editNewPluginInput, setEditNewPluginInput] = useState<string>("");
   const [editBulkPluginsInput, setEditBulkPluginsInput] = useState<string>("");
@@ -145,6 +167,8 @@ export default function PluginPackView({
         description: newPackDesc.trim(),
         picture: newPackPicture.trim() || PRESET_PICTURES[0].url,
         plugins: rawPlugins,
+        visibility: newPackVisibility,
+        isPrivate: newPackVisibility === "private",
       };
 
       const res = await axios.post(`/api/servers/${serverId}/plugins/packs`, payload);
@@ -155,12 +179,73 @@ export default function PluginPackView({
         setNewPackName("");
         setNewPackDesc("");
         setNewPackPluginsInput("");
-        setToastMsg({ text: `Plugin Pack "${res.data.pack.name}" created successfully!`, type: "success" });
+        setToastMsg({
+          text: newPackVisibility === "private"
+            ? `Plugin Pack "${res.data.pack.name}" created as Private (Chhupa Hua)! Global World me load nahi hoga.`
+            : `Plugin Pack "${res.data.pack.name}" created & published to Global World Hub!`,
+          type: "success",
+        });
       }
     } catch (err: any) {
       setToastMsg({ text: err.response?.data?.error || "Failed to create plugin pack", type: "error" });
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleToggleVisibility = async (pack: PluginPackItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const next = pack.visibility === "private" || pack.isPrivate ? "public" : "private";
+      const res = await axios.put(`/api/servers/${serverId}/plugins/packs/${pack.id}/visibility`, { visibility: next });
+      if (res.data?.success && res.data.pack) {
+        const updated = res.data.pack;
+        setPacks((prev) => prev.map((p) => (p.id === pack.id ? updated : p)));
+        if (activePack?.id === pack.id) {
+          setActivePack(updated);
+        }
+        setToastMsg({
+          text: res.data.message || (next === "private" ? "Pack is now Private / Chhupa Hua (Hidden from Global World)." : "Pack published to Global World Hub!"),
+          type: "success",
+        });
+      }
+    } catch (err: any) {
+      setToastMsg({ text: err.response?.data?.error || "Failed to update visibility", type: "error" });
+    }
+  };
+
+  const handleCopyShareCode = (code: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(code);
+    }
+    setToastMsg({
+      text: `✓ World Share Code "${code}" copied! Jo bhi ye panel GitHub se copy karke use karega, wo is code se pack import kar sakega.`,
+      type: "success",
+    });
+  };
+
+  const handleImportPack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importShareCode.trim() && !importJsonPayload.trim()) return;
+    setIsImporting(true);
+    try {
+      const res = await axios.post(`/api/servers/${serverId}/plugins/packs/import`, {
+        shareCode: importShareCode.trim() || undefined,
+        packData: importJsonPayload.trim() || undefined,
+      });
+      if (res.data?.success && res.data.pack) {
+        setPacks((prev) => [res.data.pack, ...prev]);
+        setActivePack(res.data.pack);
+        setIsImportOpen(false);
+        setImportShareCode("");
+        setImportJsonPayload("");
+        setToastMsg({ text: res.data.message || `Pack "${res.data.pack.name}" imported successfully!`, type: "success" });
+      }
+    } catch (err: any) {
+      setToastMsg({ text: err.response?.data?.error || "Failed to import plugin pack", type: "error" });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -259,6 +344,8 @@ export default function PluginPackView({
     setEditPackName(pack.name);
     setEditPackDesc(pack.description || "");
     setEditPackPicture(pack.picture || PRESET_PICTURES[0].url);
+    const isPriv = pack.visibility === "private" || pack.isPrivate;
+    setEditPackVisibility(isPriv ? "private" : "public");
     setEditPackPlugins(pack.plugins ? pack.plugins.map((p) => ({ ...p })) : []);
     setEditNewPluginInput("");
     setEditBulkPluginsInput("");
@@ -277,6 +364,8 @@ export default function PluginPackView({
         description: editPackDesc.trim(),
         picture: editPackPicture.trim() || PRESET_PICTURES[0].url,
         plugins: editPackPlugins,
+        visibility: editPackVisibility,
+        isPrivate: editPackVisibility === "private",
       };
 
       const res = await axios.put(`/api/servers/${serverId}/plugins/packs/${editPackId}`, payload);
@@ -317,11 +406,14 @@ export default function PluginPackView({
     if (!activePack) return;
     setIsSavingActive(true);
     try {
+      const isPriv = activePack.visibility === "private" || activePack.isPrivate;
       const payload = {
         name: activePack.name,
         description: activePack.description,
         picture: activePack.picture,
         plugins: activePack.plugins,
+        visibility: isPriv ? "private" : "public",
+        isPrivate: Boolean(isPriv),
       };
 
       const res = await axios.put(`/api/servers/${serverId}/plugins/packs/${activePack.id}`, payload);
@@ -418,12 +510,34 @@ export default function PluginPackView({
     }
   };
 
-  const filteredPacks = packs.filter(
-    (p) =>
+  const totalCount = packs.length;
+  const globalCount = packs.filter((p) => Boolean(p.isGlobal) || (p.visibility !== "private" && !p.isPrivate)).length;
+  const privateCount = packs.filter((p) => p.visibility === "private" || Boolean(p.isPrivate)).length;
+  const presetsCount = packs.filter((p) => Boolean(p.isPreset)).length;
+  const customCount = packs.filter((p) => !p.isPreset).length;
+
+  const filteredPacks = packs.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(searchFilter.toLowerCase()) ||
       p.description.toLowerCase().includes(searchFilter.toLowerCase()) ||
-      p.plugins.some((pl) => pl.name.toLowerCase().includes(searchFilter.toLowerCase()))
-  );
+      p.plugins.some((pl) => pl.name.toLowerCase().includes(searchFilter.toLowerCase()));
+
+    if (!matchesSearch) return false;
+
+    if (packCategoryFilter === "global") {
+      return Boolean(p.isGlobal) || (p.visibility !== "private" && !p.isPrivate);
+    }
+    if (packCategoryFilter === "private") {
+      return p.visibility === "private" || Boolean(p.isPrivate);
+    }
+    if (packCategoryFilter === "custom") {
+      return !p.isPreset;
+    }
+    if (packCategoryFilter === "presets") {
+      return Boolean(p.isPreset);
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6 text-foreground animate-in fade-in duration-200">
@@ -477,18 +591,18 @@ export default function PluginPackView({
                 <Package className="w-4 h-4" />
               </div>
               <h2 className="text-lg sm:text-xl font-black tracking-tight text-foreground font-mono">
-                {activePack ? activePack.name : "Plugin Packs (Modpack Style)"}
+                {activePack ? activePack.name : "Plugin Packs & Global World Hub"}
               </h2>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               {activePack
-                ? "Manage plugins inside this pack, install in 1-click, or customize."
-                : "Ek click me pura plugin pack install karein ya apna custom pack banayein."}
+                ? "Manage plugins inside this pack, install in 1-click, or customize visibility."
+                : "Ek click me pura plugin pack install karein, Global World me share karein ya private chhupayein."}
             </p>
           </div>
         </div>
 
-        {/* Top Actions: Create Pack & Upload ZIP */}
+        {/* Top Actions: Import, Create Pack & Upload ZIP */}
         <div className="flex items-center gap-2 flex-wrap">
           {activePack && (
             <>
@@ -520,6 +634,16 @@ export default function PluginPackView({
               </button>
             </>
           )}
+
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-muted border border-border hover:bg-muted-hover text-foreground text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+            title="Import plugin pack using a World Share Code or JSON"
+          >
+            <Globe className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Import World Pack</span>
+            <span className="sm:hidden">Import</span>
+          </button>
 
           <button
             onClick={() => setIsZipModalOpen(true)}
@@ -598,6 +722,65 @@ export default function PluginPackView({
                     <CheckCircle2 className="w-3.5 h-3.5" /> {hasUnsavedChanges ? "Unsaved Edits" : "Ready / Saved"}
                   </span>
                 </div>
+              </div>
+
+              {/* World Hub & Privacy / Chhupa Hua Section */}
+              <div className="p-3 rounded-2xl bg-muted/40 border border-border space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    {activePack.visibility === "private" || activePack.isPrivate ? (
+                      <>
+                        <Lock className="w-3.5 h-3.5 text-rose-500" />
+                        <span className="text-rose-500">Private / Chhupa Hua</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-emerald-500">Global World Hub</span>
+                      </>
+                    )}
+                  </span>
+
+                  <button
+                    onClick={() => handleToggleVisibility(activePack)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold bg-muted hover:bg-muted-hover border border-border text-foreground transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                    title="Toggle between Global World and Private/Hidden"
+                  >
+                    {activePack.visibility === "private" || activePack.isPrivate ? (
+                      <>
+                        <Unlock className="w-3 h-3 text-emerald-500" />
+                        <span>Publish to World</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-3 h-3 text-rose-500" />
+                        <span>Chhupao (Make Private)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <p className="text-[10px] text-muted-foreground font-mono leading-relaxed">
+                  {activePack.visibility === "private" || activePack.isPrivate
+                    ? "Ye pack local aur chhupa hua hai. Agar koi panel GitHub se copy karke use kare to ye pack load nahi hoga."
+                    : "Ye pack Global World me visible hai. Jo bhi panel GitHub se copy karega, usko world me show hoga."}
+                </p>
+
+                {activePack.shareCode && (
+                  <div className="flex items-center justify-between p-2 rounded-xl bg-card border border-border text-xs font-mono">
+                    <span className="text-muted-foreground text-[11px] truncate mr-2">
+                      Share Code: <strong className="text-foreground">{activePack.shareCode}</strong>
+                    </span>
+                    <button
+                      onClick={() => handleCopyShareCode(activePack.shareCode!)}
+                      className="px-2 py-0.5 rounded-md bg-theme-500/15 text-theme-600 dark:text-theme-400 hover:bg-theme-500/25 border border-theme-500/30 text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer shrink-0"
+                      title="Copy World Share Code"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons: Install Full Pack */}
@@ -835,6 +1018,70 @@ export default function PluginPackView({
             />
           </div>
 
+          {/* Category Filter Pills & World Hub Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-card/60 border border-border rounded-2xl">
+              <button
+                onClick={() => setPackCategoryFilter("all")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                  packCategoryFilter === "all"
+                    ? "bg-theme-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                🌟 All Packs ({totalCount})
+              </button>
+              <button
+                onClick={() => setPackCategoryFilter("global")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  packCategoryFilter === "global"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-emerald-400 hover:bg-muted"
+                }`}
+                title="Global World Hub - Visible across all panel copies and GitHub clones"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Global World Hub ({globalCount})</span>
+              </button>
+              <button
+                onClick={() => setPackCategoryFilter("private")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  packCategoryFilter === "private"
+                    ? "bg-rose-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-rose-400 hover:bg-muted"
+                }`}
+                title="Chhupa Hua / Secret Packs - Hidden from Global World Hub, local to this server only"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Private / Chhupa Hua ({privateCount})</span>
+              </button>
+              <button
+                onClick={() => setPackCategoryFilter("custom")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                  packCategoryFilter === "custom"
+                    ? "bg-theme-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                👤 Custom ({customCount})
+              </button>
+              <button
+                onClick={() => setPackCategoryFilter("presets")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                  packCategoryFilter === "presets"
+                    ? "bg-theme-500 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                📦 Presets ({presetsCount})
+              </button>
+            </div>
+
+            <span className="text-[11px] font-mono text-muted-foreground hidden sm:block">
+              Showing {filteredPacks.length} packs
+            </span>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center py-20 text-muted-foreground">
               <RefreshCw className="w-6 h-6 animate-spin text-theme-500 mr-2" />
@@ -864,6 +1111,20 @@ export default function PluginPackView({
                           {pack.isPreset ? "Preset Pack" : "Custom Pack"}
                         </span>
                       </div>
+
+                      {/* World / Private Badge on Image */}
+                      <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                        {pack.visibility === "private" || pack.isPrivate ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-950/80 border border-rose-500/40 text-rose-300 flex items-center gap-1 backdrop-blur-md shadow-sm">
+                            <Lock className="w-3 h-3" /> Chhupa Hua
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 flex items-center gap-1 backdrop-blur-md shadow-sm">
+                            <Globe className="w-3 h-3" /> Global World
+                          </span>
+                        )}
+                      </div>
+
                       <div className="absolute bottom-2.5 left-3 right-3 text-white">
                         <h4 className="text-base font-bold font-mono tracking-tight leading-tight line-clamp-1 drop-shadow-sm">
                           {pack.name}
@@ -899,8 +1160,42 @@ export default function PluginPackView({
                     </div>
                   </div>
 
-                  {/* Card Actions: Install Pack, Edit Pack, and Details */}
+                  {/* Card Actions: Install Pack, Edit Pack, Details & Quick Toggle */}
                   <div className="p-4 pt-0 space-y-2">
+                    {/* Quick World Toggle & Share Code Row */}
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-muted/50 border border-border text-[11px] font-mono">
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleVisibility(pack, e)}
+                        className="flex items-center gap-1 text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-95"
+                        title={pack.visibility === "private" || pack.isPrivate ? "Click to Publish to Global World" : "Click to Chhupao (Make Private)"}
+                      >
+                        {pack.visibility === "private" || pack.isPrivate ? (
+                          <>
+                            <Unlock className="w-3 h-3 text-emerald-500" />
+                            <span className="text-[10px] text-emerald-500 font-bold">Publish to World</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-3 h-3 text-rose-500" />
+                            <span className="text-[10px] text-rose-400 font-bold">Chhupao (Make Private)</span>
+                          </>
+                        )}
+                      </button>
+
+                      {pack.shareCode && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyShareCode(pack.shareCode!, e)}
+                          className="px-2 py-0.5 rounded-md bg-card border border-border hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] font-mono font-bold flex items-center gap-1 cursor-pointer transition-colors active:scale-95"
+                          title="Copy Share Code to use on any panel copy"
+                        >
+                          <Copy className="w-3 h-3 text-theme-500" />
+                          <span>Code: {pack.shareCode}</span>
+                        </button>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         onClick={() => handleInstallEntirePack(pack)}
@@ -1038,6 +1333,50 @@ export default function PluginPackView({
                 />
               </div>
 
+              {/* Visibility & Security Option: Global World vs Private Chhupa Hua */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <label className="text-xs font-mono font-bold text-foreground block">
+                  Pack Visibility & Security (Global World vs Chhupa Hua)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewPackVisibility("public")}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      newPackVisibility === "public"
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/30"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted-hover"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-xs mb-0.5">
+                      <Globe className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Global World</span>
+                    </div>
+                    <p className="text-[10px] font-mono opacity-80 leading-tight">
+                      Jo bhi panel GitHub se copy karke use karega, uske paas show hoga.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewPackVisibility("private")}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      newPackVisibility === "private"
+                        ? "bg-rose-500/15 border-rose-500/50 text-rose-600 dark:text-rose-300 ring-1 ring-rose-500/30"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted-hover"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-xs mb-0.5">
+                      <Lock className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Chhupa Hua (Secret)</span>
+                    </div>
+                    <p className="text-[10px] font-mono opacity-80 leading-tight">
+                      Sirf local rahega. Kisi aur ke cloned panel me load nahi hoga.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
                 <button
                   type="button"
@@ -1157,7 +1496,94 @@ export default function PluginPackView({
         </div>
       )}
 
-      {/* MODAL 3: EDIT PLUGIN PACK */}
+      {/* MODAL 3: IMPORT GLOBAL WORLD PACK */}
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold font-mono text-foreground">
+                    Import Global World Pack
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    World Share Code ya JSON se pack import karein
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsImportOpen(false)}
+                className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleImportPack} className="space-y-4">
+              <div>
+                <label className="text-xs font-mono font-bold text-foreground block mb-1">
+                  World Share Code (e.g. JTG-WORLD-SURVIVAL)
+                </label>
+                <input
+                  type="text"
+                  value={importShareCode}
+                  onChange={(e) => setImportShareCode(e.target.value)}
+                  placeholder="e.g. JTG-WORLD-BEDROCK or JTG-WORLD-17290..."
+                  className="w-full bg-muted border border-border focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-foreground font-mono outline-none uppercase"
+                />
+                <p className="text-[10px] text-muted-foreground font-mono mt-1">
+                  Jo bhi panel GitHub se copy karke use karega, wo is code se directly pack import kar sakega.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-mono font-bold text-foreground block mb-1">
+                  Ya Pack JSON Payload (Optional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={importJsonPayload}
+                  onChange={(e) => setImportJsonPayload(e.target.value)}
+                  placeholder='{"name": "Custom Pack", "plugins": [{"name": "EssentialsX"}]}'
+                  className="w-full bg-muted border border-border focus:border-emerald-500 rounded-xl px-3.5 py-2 text-xs text-foreground font-mono outline-none resize-none font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsImportOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-muted border border-border hover:bg-muted-hover text-foreground text-xs font-mono font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isImporting || (!importShareCode.trim() && !importJsonPayload.trim())}
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold text-xs transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isImporting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Import to My Panel</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: EDIT PLUGIN PACK */}
       {isEditOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
           <div className="bg-card border border-border rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl p-6 space-y-4">
@@ -1249,6 +1675,50 @@ export default function PluginPackView({
                       {preset.label}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Visibility & Security Option: Global World vs Private Chhupa Hua */}
+              <div className="space-y-2 pt-2 border-t border-border">
+                <label className="text-xs font-mono font-bold text-foreground block">
+                  Pack Visibility & Security (Global World vs Chhupa Hua)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditPackVisibility("public")}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      editPackVisibility === "public"
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-600 dark:text-emerald-300 ring-1 ring-emerald-500/30"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted-hover"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-xs mb-0.5">
+                      <Globe className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Global World</span>
+                    </div>
+                    <p className="text-[10px] font-mono opacity-80 leading-tight">
+                      Jo bhi panel GitHub se copy karke use karega, uske paas show hoga.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditPackVisibility("private")}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      editPackVisibility === "private"
+                        ? "bg-rose-500/15 border-rose-500/50 text-rose-600 dark:text-rose-300 ring-1 ring-rose-500/30"
+                        : "bg-muted border-border text-muted-foreground hover:bg-muted-hover"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-xs mb-0.5">
+                      <Lock className="w-3.5 h-3.5 text-rose-500" />
+                      <span>Chhupa Hua (Secret)</span>
+                    </div>
+                    <p className="text-[10px] font-mono opacity-80 leading-tight">
+                      Sirf local rahega. Kisi aur ke cloned panel me load nahi hoga.
+                    </p>
+                  </button>
                 </div>
               </div>
 

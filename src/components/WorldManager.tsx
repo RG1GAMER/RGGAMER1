@@ -88,6 +88,16 @@ export default function WorldManager({
   const [targetFolderName, setTargetFolderName] = useState<string>("world");
   const [autoUpdateProperties, setAutoUpdateProperties] = useState(true);
 
+  // Auto-Import Zero-Code States
+  const [autoDropFile, setAutoDropFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [autoImportResult, setAutoImportResult] = useState<{
+    worldFolder: string;
+    levelName: string;
+    version: string;
+    hasLevelDat: boolean;
+  } | null>(null);
+
   const isServerRunning =
     server?.status === "online" ||
     server?.status === "running" ||
@@ -194,60 +204,72 @@ export default function WorldManager({
     }
   };
 
-  // Upload World (.zip or folder)
-  const handleUploadWorld = async () => {
-    if (!uploadFile) return;
+  // Auto-Import World (Zero Code / Worldwide Auto-Detection)
+  const handleExecuteAutoImport = async (fileToImport?: File) => {
+    const file = fileToImport || autoDropFile || uploadFile;
+    if (!file) return;
 
     setIsProcessing(true);
     setUploadProgress(0);
+    setAutoImportResult(null);
 
     try {
       if (isServerRunning) {
-        setProcessStep("Stopping server safely before uploading world...");
+        setProcessStep("Stopping server safely to prevent chunk locking...");
         try {
           await axios.post(`/api/servers/${serverId}/stop`);
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 1200));
         } catch (stopErr) {
-          console.warn("Stop warning:", stopErr);
+          console.warn("Notice during server stop:", stopErr);
         }
       }
 
-      setProcessStep("Uploading world archive...");
+      setProcessStep(`Uploading & streaming world archive '${file.name}'...`);
       const formData = new FormData();
-      formData.append("file", uploadFile);
-      formData.append("path", "/");
+      formData.append("file", file);
+      if (targetFolderName && targetFolderName !== "world") {
+        formData.append("targetFolderName", targetFolderName.trim());
+      }
+      formData.append("autoUpdateProperties", String(autoUpdateProperties));
 
-      await axios.post(`/api/servers/${serverId}/files/upload`, formData, {
+      const res = await axios.post(`/api/servers/${serverId}/world/auto-import`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             setUploadProgress(percent);
+            if (percent >= 100) {
+              setProcessStep("Auto-detecting world structure, extracting chunks & configuring server.properties...");
+            }
           }
         },
       });
 
       setUploadProgress(null);
-      setProcessStep("Extracting world and configuring dimensions...");
-      const chosenName = targetFolderName.trim() || "world";
-
-      const importRes = await axios.post(`/api/servers/${serverId}/world/import`, {
-        zipPath: uploadFile.name,
-        targetFolderName: chosenName,
-        autoUpdateProperties,
+      showToast(res.data?.message || "World successfully imported & activated!", "success");
+      setAutoImportResult({
+        worldFolder: res.data?.worldFolder || "world",
+        levelName: res.data?.levelName || res.data?.worldFolder || "world",
+        version: res.data?.version || "Auto-detected",
+        hasLevelDat: res.data?.hasLevelDat ?? true,
       });
-
-      showToast(importRes.data?.message || `World uploaded into /${chosenName} successfully!`, "success");
+      setAutoDropFile(null);
       setUploadFile(null);
       setShowUploadModal(null);
       await fetchWorldData();
     } catch (err: any) {
-      showToast(err.response?.data?.error || err.message || "Failed to import world", "error");
+      showToast(err.response?.data?.error || err.message || "Failed to auto-import world", "error");
     } finally {
       setIsProcessing(false);
       setProcessStep("");
       setUploadProgress(null);
     }
+  };
+
+  // Upload World (.zip, .mcworld, or folder)
+  const handleUploadWorld = async () => {
+    if (!uploadFile) return;
+    await handleExecuteAutoImport(uploadFile);
   };
 
   // Delete World Dimension
@@ -334,6 +356,134 @@ export default function WorldManager({
           </span>
         </div>
       )}
+
+      {/* GLOBAL AUTOMATIC WORLD IMPORTER (ZERO CODE / AUTO-DETECT) */}
+      <div className="bg-gradient-to-br from-zinc-950/90 via-zinc-900/60 to-emerald-950/20 backdrop-blur-xl border border-emerald-500/30 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-bold text-white font-mono flex items-center gap-2">
+                  Auto World Importer
+                  <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Zero Code • Auto-Detect
+                  </span>
+                </h2>
+              </div>
+              <p className="text-xs font-mono text-slate-400 mt-0.5">
+                Upload any world archive (<code className="text-emerald-300">.zip</code>, <code className="text-emerald-300">.mcworld</code>, <code className="text-emerald-300">.tar.gz</code>). The system automatically detects level.dat, extracts chunks into the server root, and activates it.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Dropzone */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragOver(true);
+          }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragOver(false);
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              const file = e.dataTransfer.files[0];
+              setAutoDropFile(file);
+              handleExecuteAutoImport(file);
+            }
+          }}
+          className={`border-2 border-dashed rounded-2xl p-6 transition-all text-center flex flex-col items-center justify-center gap-3 cursor-pointer ${
+            isDragOver
+              ? "border-emerald-400 bg-emerald-500/15 scale-[1.008]"
+              : "border-emerald-500/25 bg-black/40 hover:bg-black/60 hover:border-emerald-500/50"
+          }`}
+          onClick={() => {
+            document.getElementById("auto-world-input")?.click();
+          }}
+        >
+          <input
+            id="auto-world-input"
+            type="file"
+            accept=".zip,.mcworld,.tar,.gz,.tgz,.rar,.7z"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                const file = e.target.files[0];
+                setAutoDropFile(file);
+                handleExecuteAutoImport(file);
+              }
+            }}
+          />
+
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+            <Archive className="w-6 h-6" />
+          </div>
+
+          <div className="space-y-1 max-w-md">
+            <p className="text-sm font-bold font-mono text-white">
+              {autoDropFile ? autoDropFile.name : "Drop world archive here or click to browse"}
+            </p>
+            <p className="text-xs font-mono text-slate-400">
+              Auto-detects Minecraft worlds inside zip archives or Bedrock .mcworld packages with zero manual setup.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-2 pt-1 text-[11px] font-mono text-emerald-400/90">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              ✓ Auto Level.dat Finding
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              ✓ Safe Server Stop
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              ✓ Server Properties Sync
+            </span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              ✓ Pre-import Backup
+            </span>
+          </div>
+        </div>
+
+        {/* Upload & processing progress */}
+        {isProcessing && processStep && (
+          <div className="space-y-2 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
+            <div className="flex items-center justify-between text-xs font-mono text-emerald-300">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                <span>{processStep}</span>
+              </div>
+              {uploadProgress !== null && <span>{uploadProgress}%</span>}
+            </div>
+            {uploadProgress !== null && (
+              <div className="w-full h-2 bg-black/50 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Success confirmation card */}
+        {autoImportResult && !isProcessing && (
+          <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs font-mono">
+              <p className="font-bold text-emerald-200">
+                World Automatically Imported & Ready to Play!
+              </p>
+              <p className="text-slate-300">
+                Extracted into: <code className="text-white bg-black/40 px-1.5 py-0.5 rounded">/{autoImportResult.worldFolder}</code> • Level: <strong className="text-white">{autoImportResult.levelName}</strong> • Version: {autoImportResult.version}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* DIMENSION CARDS CONTAINER */}
       {worlds.length === 0 ? (
@@ -722,29 +872,29 @@ export default function WorldManager({
 
             <div className="space-y-3 pt-2">
               <div>
-                <label className="block text-xs font-mono font-bold text-slate-200 mb-1">Target Dimension Folder</label>
+                <label className="block text-xs font-mono font-bold text-slate-200 mb-1">Target Dimension Folder (Optional)</label>
                 <input
                   type="text"
                   value={targetFolderName}
                   onChange={(e) => setTargetFolderName(e.target.value)}
                   className="w-full bg-black/60 border border-white/10 focus:border-theme-500 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none"
-                  placeholder="world or world_nether"
+                  placeholder="Leave blank to auto-detect from level.dat"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono font-bold text-slate-200 mb-1">Select .zip Archive</label>
+                <label className="block text-xs font-mono font-bold text-slate-200 mb-1">Select World Archive (.zip, .mcworld)</label>
                 <label className="p-6 border-2 border-dashed border-white/20 hover:border-theme-500 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer bg-black/40 hover:bg-black/60 transition-all text-center block">
                   <Archive className="w-8 h-8 text-slate-400" />
                   <span className="text-xs font-mono font-bold text-white">
-                    {uploadFile ? uploadFile.name : "Click to browse world .zip archive"}
+                    {uploadFile ? uploadFile.name : "Click to browse world archive"}
                   </span>
                   <span className="text-[11px] font-mono text-slate-500">
-                    Supports .zip containing level.dat and region/
+                    Supports .zip, .mcworld, .tar.gz with auto level.dat detection
                   </span>
                   <input
                     type="file"
-                    accept=".zip"
+                    accept=".zip,.mcworld,.tar,.gz,.tgz,.rar,.7z"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "global_pack_pvp_faction",
+    "name": "PvP & Factions Arena World Pack",
+    "description": "Battle-tested PvP community pack with CombatLogX, WorldGuard, PlayerVaults, and Duels for high-stakes competition.",
+    "picture": "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80",
+    "author": "Global Community",
+    "isPreset": false,
+    "isGlobal": true,
+    "visibility": "public",
+    "shareCode": "JTG-WORLD-FACTIONS",
+    "plugins": [
+      { "name": "WorldGuard", "source": "modrinth", "id": "worldguard" },
+      { "name": "CombatLogX", "source": "spigot", "id": "combatlogx" },
+      { "name": "PlayerVaultsX", "source": "spigot", "id": "playervaultsx" },
+      { "name": "Duels", "source": "spigot", "id": "duels" },
+      { "name": "Vault", "source": "spigot", "id": "vault" }
+    ]
+  },
+  {
+    "id": "global_pack_rpg_mcmmo",
+    "name": "MMORPG & Leveling Overhaul",
+    "description": "Transform Minecraft into an expansive MMORPG with skill levels, custom item lore, quest boards, and mythic bosses.",
+    "picture": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80",
+    "author": "Global RPG Guild",
+    "isPreset": false,
+    "isGlobal": true,
+    "visibility": "public",
+    "shareCode": "JTG-WORLD-MMORPG",
+    "plugins": [
+      { "name": "mcMMO", "source": "spigot", "id": "mcmmo" },
+      { "name": "AuraSkills", "source": "modrinth", "id": "auraskills" },
+      { "name": "MythicMobs", "source": "spigot", "id": "mythicmobs" },
+      { "name": "DecentHolograms", "source": "spigot", "id": "decentholograms" }
+    ]
+  },
+  {
+    "id": "global_pack_skyblock_economy",
+    "name": "Skyblock Extreme & Island Generator",
+    "description": "Official community Skyblock setup with island challenges, cobblestone generators, chest shops, and leaderboard tops.",
+    "picture": "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80",
+    "author": "Skyblock Global",
+    "isPreset": false,
+    "isGlobal": true,
+    "visibility": "public",
+    "shareCode": "JTG-WORLD-SKYBLOCK",
+    "plugins": [
+      { "name": "BentoBox", "source": "modrinth", "id": "bentobox" },
+      { "name": "BSkyBlock", "source": "modrinth", "id": "bskyblock" },
+      { "name": "Vault", "source": "spigot", "id": "vault" },
+      { "name": "QuickShop-Hikari", "source": "modrinth", "id": "quickshop-hikari" }
+    ]
+  }
+]

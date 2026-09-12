@@ -219,7 +219,7 @@ export default function ServerView() {
           This server has been suspended by an administrator. You cannot access or manage this server until the suspension is removed.
         </p>
         <Link 
-          to="/servers" 
+          to="/" 
           className="inline-flex items-center justify-center px-6 py-2.5 bg-muted hover:bg-muted-hover text-foreground text-sm font-medium rounded-lg transition-colors border border-border"
         >
           Return to Dashboard
@@ -307,7 +307,7 @@ export default function ServerView() {
       >
         <div className="flex items-center justify-between p-4 border-b border-theme-500/20 shrink-0 bg-card/80">
           <div className="flex items-center gap-3 min-w-0">
-             <Link to="/servers" className="p-1.5 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-lg text-theme-400 hover:text-theme-100 transition-all shrink-0" title="Back to Servers">
+             <Link to="/" className="p-1.5 bg-theme-900/40 hover:bg-theme-500/20 border border-theme-500/30 shadow-sm rounded-lg text-theme-400 hover:text-theme-100 transition-all shrink-0" title="Back to Dashboard">
               <ArrowLeft size={16} />
             </Link>
             <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-theme-300 via-theme-200 to-theme-400 bg-clip-text text-transparent truncate pr-2">{server.name}</h1>
@@ -445,21 +445,14 @@ export default function ServerView() {
           
           <div className="text-xs font-semibold text-muted-foreground mb-2 px-3 tracking-wider uppercase">Navigation</div>
 
-          {navTabs.map(tab => {
-             return (
-              <Link 
-                key={tab.name}
-                to={tab.path}
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium transition-all rounded-lg text-muted-foreground hover:text-foreground hover:bg-theme-500/10 hover:border-theme-500/25 border border-transparent group active:scale-[0.98]"
-              >
-                <div className="text-muted-foreground group-hover:text-theme-400 transition-colors">
-                  {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
-                </div>
-                <span className="group-hover:text-foreground transition-colors">{tab.name}</span>
-              </Link>
-            );
-          })}
+          <Link 
+            to="/"
+            onClick={() => setSidebarOpen(false)}
+            className="flex items-center space-x-3 px-3 py-2.5 text-sm font-medium transition-all rounded-lg text-theme-300 hover:text-white bg-theme-500/15 hover:bg-theme-500/25 border border-theme-500/30 group active:scale-[0.98] shadow-sm"
+          >
+            <LayoutDashboard className="w-4 h-4 text-theme-400 group-hover:scale-105 transition-transform shrink-0" />
+            <span className="font-bold">Back to Dashboard</span>
+          </Link>
         </div>
       </div>
 
@@ -467,8 +460,8 @@ export default function ServerView() {
         {/* Top Header with Hamburger and Power Controls */}
         <div className="bg-card/90 backdrop-blur-2xl border-b border-theme-500/20 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-lg relative z-20">
           
-          {/* Left: 3-Lines Hamburger Menu Button + Server Name + Status */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          {/* Left: 3-Lines Hamburger Menu Button + Back to Dashboard + Server Name + Status */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <button 
               onClick={toggleSidebar}
               className={`p-2.5 border shadow-sm rounded-xl transition-all items-center justify-center shrink-0 active:scale-95 cursor-pointer ${
@@ -481,6 +474,17 @@ export default function ServerView() {
             >
               <Menu size={20} className="text-theme-400" />
             </button>
+
+            {/* Direct Back to Dashboard Link in Header */}
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-theme-500/10 hover:bg-theme-500/20 border border-theme-500/30 text-xs font-mono text-theme-300 hover:text-white transition-all shadow-sm group shrink-0 active:scale-95"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+              <span className="hidden sm:inline font-bold">BACK TO DASHBOARD</span>
+              <span className="sm:hidden font-bold">DASHBOARD</span>
+            </Link>
 
             <div className="flex items-center gap-2 min-w-0">
               <h1 className="text-base sm:text-lg font-bold tracking-tight bg-gradient-to-r from-theme-300 via-theme-200 to-theme-400 bg-clip-text text-transparent truncate leading-none">

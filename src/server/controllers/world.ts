@@ -6,6 +6,9 @@ import { promisify } from "util";
 import zlib from "zlib";
 import * as archiverPkg from "archiver";
 import { extractArchive } from "../utils/extract.js";
+import { panelEvents } from "../events.js";
+import { readJSON, writeJSON } from "../services/db.js";
+import { stopServerRuntime } from "../services/runtime.js";
 
 const archiver = (archiverPkg as any).default || archiverPkg;
 const parseNbt = promisify(nbt.parse);
@@ -377,6 +380,24 @@ async function locateMinecraftWorldFolder(rootDir: string): Promise<ScoredWorldC
         let detectedName = path.basename(dir);
         if (dir === rootDir || detectedName.startsWith("temp_")) {
           detectedName = "world";
+        }
+        if (lowerNames.includes("levelname.txt")) {
+          try {
+            const raw = await fs.readFile(path.join(dir, "levelname.txt"), "utf-8");
+            if (raw && raw.trim()) detectedName = raw.trim();
+          } catch {}
+        } else if (hasLevelDatFile) {
+          try {
+            const lPath = path.join(dir, "level.dat");
+            if (fs.existsSync(lPath)) {
+              const buf = await fs.readFile(lPath);
+              const { parsed } = (await parseNbt(buf)) as any;
+              const lvl = parsed?.value?.Data?.value?.LevelName?.value;
+              if (lvl && typeof lvl === "string" && lvl.trim()) {
+                detectedName = lvl.trim();
+              }
+            }
+          } catch {}
         }
         candidates.push({
           worldDir: dir,
@@ -1156,64 +1177,133 @@ export const analyzeWorld = async (req: Request, res: Response) => {
   }
 };
 
-export const importWorld = async (req: Request, res: Response) => {
+export const autoImportWorld = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { zipPath, targetFolderName, autoUpdateProperties = true } = req.body;
   const serverDir = path.join(process.cwd(), ".data", "servers", id);
 
   try {
-    // 1. Verify server is stopped
-    const serversJSON = await fs.readFile(
-      path.join(process.cwd(), ".data", "servers.json"),
-      "utf8"
-    );
-    const servers = JSON.parse(serversJSON);
+    const servers = (await readJSON("servers.json")) || [];
     const server = servers.find((s: any) => s.id === id);
     if (!server) return res.status(404).json({ error: "Server not found" });
 
-    if (
-      server.status === "running" ||
-      server.status === "starting" ||
-      server.status === "online"
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Server is currently running. Please stop it first." });
-    }
+    // Determine source archive
+    let sourceArchive: string | null = null;
+    let isTempUpload = false;
 
-    let zipFullPath = path.join(serverDir, zipPath);
-    let origPathToDelete = zipFullPath;
-    if (!fs.existsSync(zipFullPath)) {
-      return res.status(400).json({ error: "Zip file not found" });
-    }
-
-    // If zipFullPath is a directory, find the archive file inside
-    if ((await fs.stat(zipFullPath)).isDirectory()) {
-      const filesInside = await fs.readdir(zipFullPath);
-      const matched = filesInside.find((f) => /\.(zip|tar|gz|tgz|jar|rar|7z)$/i.test(f));
-      if (matched) {
-        zipFullPath = path.join(zipFullPath, matched);
+    if (req.file) {
+      sourceArchive = req.file.path;
+      isTempUpload = true;
+    } else {
+      const relPath = req.body?.zipPath || req.body?.filePath || req.body?.fileName;
+      if (relPath) {
+        sourceArchive = path.join(serverDir, relPath);
+        if (!fs.existsSync(sourceArchive)) {
+          const directInRoot = path.join(serverDir, path.basename(relPath));
+          if (fs.existsSync(directInRoot)) {
+            sourceArchive = directInRoot;
+          }
+        }
       }
     }
 
+    if (!sourceArchive || !fs.existsSync(sourceArchive)) {
+      return res.status(400).json({ error: "No world archive file provided or file not found." });
+    }
+
+    // If sourceArchive is a directory, look for the actual archive file inside
+    let origPathToDelete = sourceArchive;
+    if ((await fs.stat(sourceArchive)).isDirectory()) {
+      const filesInside = await fs.readdir(sourceArchive);
+      const matched = filesInside.find((f) => /\.(zip|tar|gz|tgz|jar|rar|7z|mcworld)$/i.test(f));
+      if (matched) {
+        sourceArchive = path.join(sourceArchive, matched);
+      }
+    }
+
+    // Server safety: Gracefully stop server if online so chunk files aren't locked
+    const isRunning =
+      server.status === "running" ||
+      server.status === "starting" ||
+      server.status === "online";
+
+    if (isRunning) {
+      panelEvents.emit("log", id, `[World Auto-Importer] Stopping server safely for world import...\r\n`);
+      try {
+        await stopServerRuntime(server);
+        server.status = "stopped";
+        await writeJSON("servers.json", servers);
+      } catch (stopErr) {
+        console.warn("Notice during server stop:", stopErr);
+      }
+      // Give 1 second for filesystem handles to release
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+
     // 2. Extract world to temporary folder
-    const tempExtractDir = path.join(serverDir, `temp_world_${Date.now()}`);
-    await extractArchive(zipFullPath, tempExtractDir);
+    const tempExtractDir = path.join(serverDir, `temp_auto_world_${Date.now()}`);
+    await fs.ensureDir(tempExtractDir);
+    await extractArchive(sourceArchive, tempExtractDir);
 
     // 3. Locate the actual Minecraft world directory inside the extracted contents
     const detected = await locateMinecraftWorldFolder(tempExtractDir);
     if (!detected) {
       await fs.remove(tempExtractDir);
+      if (isTempUpload && fs.existsSync(sourceArchive)) {
+        await fs.remove(sourceArchive);
+      }
       return res.status(400).json({
-        error: "Invalid world archive: No Minecraft world folder structure (advancements, data, datapacks, region, level.dat) found.",
+        error: "Invalid world archive: No Minecraft world structure (region, level.dat, db, or datapacks) found.",
       });
     }
 
-    // 4. Determine final destination folder name in server root (defaults to 'world' or user's chosen folder)
+    // Attempt to extract level name & version from level.dat or levelname.txt
+    let extractedLevelName = "";
+    let extractedVersion = "";
+    let extractedDataVersion = 0;
+
+    const levelDatPath = path.join(detected.worldDir, "level.dat");
+    const levelNameTxtPath = path.join(detected.worldDir, "levelname.txt");
+
+    if (fs.existsSync(levelNameTxtPath)) {
+      try {
+        extractedLevelName = (await fs.readFile(levelNameTxtPath, "utf-8")).trim();
+      } catch {}
+    }
+
+    if (fs.existsSync(levelDatPath)) {
+      try {
+        const buffer = await fs.readFile(levelDatPath);
+        const { parsed } = (await parseNbt(buffer)) as any;
+        if (parsed?.value?.Data?.value) {
+          const data = parsed.value.Data.value;
+          if (data.LevelName?.value) {
+            extractedLevelName = data.LevelName.value;
+          }
+          if (data.Version?.value?.Name?.value) {
+            extractedVersion = data.Version.value.Name.value;
+          }
+          if (data.DataVersion?.value) {
+            extractedDataVersion = data.DataVersion.value;
+          }
+        }
+      } catch (nbtErr) {
+        console.warn("Could not read level.dat for auto import:", nbtErr);
+      }
+    }
+
+    // 4. Determine final destination folder name in server root
     const configuredLevel = await getLevelName(serverDir);
-    const chosenFolderName = (targetFolderName || "world" || detected.detectedName || configuredLevel)
+    let chosenFolderName = (
+      req.body?.targetFolderName ||
+      (detected.detectedName && detected.detectedName !== "world" && !detected.detectedName.startsWith("temp_") ? detected.detectedName : "") ||
+      extractedLevelName ||
+      configuredLevel ||
+      "world"
+    )
       .trim()
       .replace(/[/\\?%*:|"<>]/g, "-");
+
+    if (!chosenFolderName) chosenFolderName = "world";
 
     const finalWorldDestination = path.join(serverDir, chosenFolderName);
 
@@ -1223,36 +1313,52 @@ export const importWorld = async (req: Request, res: Response) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupZipPath = path.join(
       backupDir,
-      `pre_world_import_${timestamp}.zip`
+      `pre_auto_world_${chosenFolderName}_${timestamp}.zip`
     );
 
-    try {
-      const output = fs.createWriteStream(backupZipPath);
-      const archive = archiver("zip", { zlib: { level: 9 } });
-      archive.pipe(output);
-      archive.directory(serverDir, false);
-      await archive.finalize();
-    } catch (bErr) {
-      console.warn("Safety backup warning:", bErr);
-    }
-
-    // 6. Clean existing target world directory if it exists and move detected world folder directly to root
     if (fs.existsSync(finalWorldDestination)) {
+      try {
+        const output = fs.createWriteStream(backupZipPath);
+        const archive = archiver("zip", { zlib: { level: 6 } });
+        archive.pipe(output);
+        archive.directory(finalWorldDestination, false);
+        await archive.finalize();
+      } catch (bErr) {
+        console.warn("Safety backup warning:", bErr);
+      }
       await fs.remove(finalWorldDestination);
     }
-    await fs.ensureDir(finalWorldDestination);
 
-    // Move / Copy the verified world files directly into root/{chosenFolderName}
+    await fs.ensureDir(finalWorldDestination);
     await fs.copy(detected.worldDir, finalWorldDestination);
+
+    // Sibling dimensions check (e.g. world_nether, world_the_end, DIM-1, DIM1)
+    const parentDir = path.dirname(detected.worldDir);
+    if (parentDir && parentDir !== detected.worldDir) {
+      try {
+        const siblingEntries = await fs.readdir(parentDir, { withFileTypes: true });
+        for (const sib of siblingEntries) {
+          if (!sib.isDirectory()) continue;
+          const lower = sib.name.toLowerCase();
+          if (lower.endsWith("_nether") || lower === "dim-1") {
+            const destNether = path.join(serverDir, `${chosenFolderName}_nether`);
+            await fs.copy(path.join(parentDir, sib.name), destNether, { overwrite: true });
+          } else if (lower.endsWith("_the_end") || lower.endsWith("_end") || lower === "dim1") {
+            const destEnd = path.join(serverDir, `${chosenFolderName}_the_end`);
+            await fs.copy(path.join(parentDir, sib.name), destEnd, { overwrite: true });
+          }
+        }
+      } catch {}
+    }
 
     // 7. Clean up temporary extract folder
     await fs.remove(tempExtractDir);
 
-    // 8. Delete the original uploaded zip file and any wrapper folder
-    if (fs.existsSync(zipFullPath)) {
-      await fs.remove(zipFullPath);
+    // 8. Delete uploaded archive file
+    if (fs.existsSync(sourceArchive)) {
+      await fs.remove(sourceArchive);
     }
-    if (origPathToDelete !== zipFullPath && fs.existsSync(origPathToDelete)) {
+    if (origPathToDelete !== sourceArchive && fs.existsSync(origPathToDelete)) {
       await fs.remove(origPathToDelete);
     }
 
@@ -1269,16 +1375,26 @@ export const importWorld = async (req: Request, res: Response) => {
     }
 
     // 10. Automatically update server.properties level-name so server loads the new world
+    const autoUpdateProperties = req.body?.autoUpdateProperties !== false && req.body?.autoUpdateProperties !== "false";
     if (autoUpdateProperties) {
       await setLevelNameInProperties(serverDir, chosenFolderName);
     }
 
+    panelEvents.emit("log", id, `[World Auto-Importer] World '${extractedLevelName || chosenFolderName}' automatically detected and imported into /${chosenFolderName}!\r\n`);
+
     res.json({
       success: true,
-      message: `World files placed directly into '/${chosenFolderName}' in File Manager, level-name updated, and zip file deleted.`,
+      message: `World '${extractedLevelName || chosenFolderName}' automatically detected, imported into /${chosenFolderName}, and activated!`,
       worldFolder: chosenFolderName,
+      levelName: extractedLevelName || chosenFolderName,
+      version: extractedVersion || "Auto-detected",
+      dataVersion: extractedDataVersion,
+      hasLevelDat: detected.hasLevelDat,
     });
   } catch (e: any) {
+    console.error("Auto import error:", e);
     res.status(500).json({ error: e.message || "Failed to import world" });
   }
 };
+
+export const importWorld = autoImportWorld;

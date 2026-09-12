@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import axios from "axios";
 import {
   importWorld,
+  autoImportWorld,
   getWorldInfo,
   analyzeWorld,
   listWorlds,
@@ -18,7 +19,7 @@ import {
   saveResourcePackSettings
 } from "../controllers/world.js";
 import { requireAuth } from "../middleware/auth.js";
-import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, uploadExternalBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar, uploadPluginZip, getPluginPacks, createPluginPack, updatePluginPack, deletePluginPack, installPluginPack } from "../controllers/servers.js";
+import { getServers, createServer, checkPort, getServer, deleteServer, startServer, stopServer, restartServer, changeServerVersion, migrateServerRuntime, getFiles, uploadFile, uploadChunk, completeUpload, deleteFile, renameFile, saveFileContent, sendCommand, getServerStats, updateOwner, updateIpAlias, getBackups, createBackup, downloadBackup, deleteBackup, restoreBackup, uploadExternalBackup, unzipFile, zipFiles, installPlugin, installMod, installResourcePack, installDatapack, getInstalledPackages, uninstallPackage, updateResources, updateSuspend , createFile, createDirectory, downloadFile, redownloadJar, uploadPluginZip, getPluginPacks, createPluginPack, updatePluginPack, deletePluginPack, installPluginPack, togglePluginPackVisibility, importPluginPack } from "../controllers/servers.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -88,6 +89,7 @@ router.get("/:id/worlds", listWorlds);
 router.post("/:id/world/set-active", setActiveWorld);
 router.post("/:id/world/analyze", analyzeWorld);
 router.post("/:id/world/import", importWorld);
+router.post("/:id/world/auto-import", upload.single("file") as any, handleUploadError, autoImportWorld);
 router.post("/:id/world/optimize", optimizeWorld);
 router.post("/:id/world/generate", generateWorld);
 router.get("/:id/world/download", downloadWorld);
@@ -815,8 +817,11 @@ router.post("/:id/plugins/install", installPlugin);
 router.post("/:id/plugins/upload-zip", upload.single("file") as any, handleUploadError, uploadPluginZip);
 router.get("/:id/plugins/packs", getPluginPacks);
 router.post("/:id/plugins/packs", createPluginPack);
+router.post("/:id/plugins/packs/import", importPluginPack);
 router.put("/:id/plugins/packs/:packId", updatePluginPack);
 router.post("/:id/plugins/packs/:packId/save", updatePluginPack);
+router.put("/:id/plugins/packs/:packId/visibility", togglePluginPackVisibility);
+router.post("/:id/plugins/packs/:packId/visibility", togglePluginPackVisibility);
 router.delete("/:id/plugins/packs/:packId", deletePluginPack);
 router.post("/:id/plugins/install-pack", installPluginPack);
 router.post("/:id/mods/install", installMod);

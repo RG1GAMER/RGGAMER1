@@ -674,6 +674,8 @@ export default function PluginManager({ serverId }: PluginManagerProps) {
         description: editPackDesc,
         picture: editPackPicture || editingPack.picture,
         plugins: editingPack.plugins,
+        visibility: editingPack.visibility || (editingPack.isPrivate ? "private" : "public"),
+        isPrivate: editingPack.isPrivate,
       });
 
       const count = editingPack.plugins.length;

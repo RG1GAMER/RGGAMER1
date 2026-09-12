@@ -2951,6 +2951,40 @@ const DEFAULT_PLUGIN_PACKS = [
   }
 ];
 
+const COMMUNITY_PACKS_FILE = path.join(process.cwd(), "src", "data", "community_plugin_packs.json");
+
+const syncCommunityPack = async (pack: any, shouldRemove = false) => {
+  try {
+    await fs.ensureFile(COMMUNITY_PACKS_FILE);
+    let communityPacks: any[] = [];
+    try {
+      communityPacks = await fs.readJSON(COMMUNITY_PACKS_FILE);
+    } catch {}
+    if (!Array.isArray(communityPacks)) communityPacks = [];
+
+    if (shouldRemove) {
+      communityPacks = communityPacks.filter((p) => p.id !== pack.id);
+    } else {
+      const idx = communityPacks.findIndex((p) => p.id === pack.id);
+      const communityEntry = {
+        ...pack,
+        isGlobal: true,
+        visibility: "public",
+        isPrivate: false,
+        shareCode: pack.shareCode || `JTG-WORLD-${pack.id.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+      };
+      if (idx !== -1) {
+        communityPacks[idx] = communityEntry;
+      } else {
+        communityPacks.push(communityEntry);
+      }
+    }
+    await fs.writeJSON(COMMUNITY_PACKS_FILE, communityPacks, { spaces: 2 });
+  } catch (e) {
+    console.error("Failed to sync community packs file:", e);
+  }
+};
+
 export const getPluginPacks = async (req: Request, res: Response) => {
   try {
     const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
@@ -2960,9 +2994,56 @@ export const getPluginPacks = async (req: Request, res: Response) => {
         customPacks = await fs.readJSON(packsFile);
       } catch {}
     }
+
+    let communityPacks: any[] = [];
+    if (await fs.pathExists(COMMUNITY_PACKS_FILE)) {
+      try {
+        communityPacks = await fs.readJSON(COMMUNITY_PACKS_FILE);
+      } catch {}
+    }
+
     const customIds = new Set(customPacks.map(p => p.id));
-    const presets = DEFAULT_PLUGIN_PACKS.filter(p => !customIds.has(p.id));
-    const combined = [...presets, ...customPacks];
+    const communityFiltered = (communityPacks || [])
+      .filter(p => !customIds.has(p.id))
+      .map(p => ({
+        ...p,
+        isGlobal: true,
+        visibility: "public",
+        isPrivate: false,
+        shareCode: p.shareCode || `JTG-WORLD-${p.id.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+      }));
+
+    const allCustomAndCommunityIds = new Set([...customPacks.map(p => p.id), ...communityFiltered.map(p => p.id)]);
+    const presets = DEFAULT_PLUGIN_PACKS
+      .filter(p => !allCustomAndCommunityIds.has(p.id))
+      .map(p => ({
+        ...p,
+        isGlobal: true,
+        visibility: "public",
+        isPrivate: false,
+        shareCode: `JTG-WORLD-${p.id.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+      }));
+
+    const normalizedCustom = customPacks.map(p => {
+      const isPriv = p.visibility === "private" || p.isPrivate === true;
+      return {
+        ...p,
+        isPrivate: isPriv,
+        visibility: isPriv ? "private" : "public",
+        isGlobal: !isPriv,
+        shareCode: p.shareCode || `JTG-WORLD-${p.id.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`
+      };
+    });
+
+    let combined = [...presets, ...communityFiltered, ...normalizedCustom];
+
+    // If query requests public global only, filter out private / hidden packs
+    const filterVisibility = req.query.visibility as string;
+    const filterScope = req.query.scope as string;
+    if (filterVisibility === "public" || filterScope === "global") {
+      combined = combined.filter(p => p.visibility !== "private" && !p.isPrivate);
+    }
+
     res.json(combined);
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to fetch plugin packs" });
@@ -2971,8 +3052,8 @@ export const getPluginPacks = async (req: Request, res: Response) => {
 
 export const createPluginPack = async (req: Request, res: Response) => {
   try {
-    const { name, description, picture, plugins } = req.body;
-    if (!name) {
+    const { name, description, picture, plugins, visibility, isPrivate } = req.body;
+    if (!name || !name.trim()) {
       return res.status(400).json({ error: "Pack name is required" });
     }
     const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
@@ -2982,18 +3063,34 @@ export const createPluginPack = async (req: Request, res: Response) => {
       customPacks = await fs.readJSON(packsFile);
     } catch {}
 
+    const isPriv = visibility === "private" || isPrivate === true;
+    const packId = `pack_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const shareCode = `JTG-WORLD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
     const newPack = {
-      id: `pack_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-      name,
-      description: description || "",
-      picture: picture || "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
+      id: packId,
+      name: name.trim(),
+      description: description ? description.trim() : "",
+      picture: picture && picture.trim() ? picture.trim() : "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
       author: (req as any).user?.username || "Admin",
       isPreset: false,
-      plugins: Array.isArray(plugins) ? plugins : []
+      isPrivate: isPriv,
+      visibility: isPriv ? "private" : "public",
+      isGlobal: !isPriv,
+      shareCode,
+      plugins: Array.isArray(plugins) ? plugins : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     customPacks.push(newPack);
     await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+
+    // If marked public (global world), sync to community packs repo file!
+    if (!isPriv) {
+      await syncCommunityPack(newPack, false);
+    }
+
     res.json({ success: true, pack: newPack });
   } catch (err: any) {
     res.status(500).json({ error: err.message || "Failed to create plugin pack" });
@@ -3003,7 +3100,7 @@ export const createPluginPack = async (req: Request, res: Response) => {
 export const updatePluginPack = async (req: Request, res: Response) => {
   try {
     const { packId } = req.params;
-    const { name, description, picture, plugins, author } = req.body;
+    const { name, description, picture, plugins, author, visibility, isPrivate } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Pack name cannot be empty" });
     }
@@ -3020,6 +3117,14 @@ export const updatePluginPack = async (req: Request, res: Response) => {
     const existingIdx = customPacks.findIndex(p => p.id === packId);
     let updatedPack: any;
 
+    const isPriv = visibility !== undefined
+      ? visibility === "private"
+      : isPrivate !== undefined
+      ? Boolean(isPrivate)
+      : existingIdx !== -1
+      ? Boolean(customPacks[existingIdx].isPrivate || customPacks[existingIdx].visibility === "private")
+      : false;
+
     if (existingIdx !== -1) {
       updatedPack = {
         ...customPacks[existingIdx],
@@ -3027,6 +3132,10 @@ export const updatePluginPack = async (req: Request, res: Response) => {
         description: description !== undefined ? description.trim() : customPacks[existingIdx].description,
         picture: picture !== undefined && picture.trim() ? picture.trim() : customPacks[existingIdx].picture,
         plugins: Array.isArray(plugins) ? plugins : customPacks[existingIdx].plugins,
+        isPrivate: isPriv,
+        visibility: isPriv ? "private" : "public",
+        isGlobal: !isPriv,
+        shareCode: customPacks[existingIdx].shareCode || `JTG-WORLD-${packId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`,
         updatedAt: new Date().toISOString()
       };
       customPacks[existingIdx] = updatedPack;
@@ -3040,6 +3149,10 @@ export const updatePluginPack = async (req: Request, res: Response) => {
           picture: picture !== undefined && picture.trim() ? picture.trim() : defaultPreset.picture,
           plugins: Array.isArray(plugins) ? plugins : defaultPreset.plugins,
           isPreset: false,
+          isPrivate: isPriv,
+          visibility: isPriv ? "private" : "public",
+          isGlobal: !isPriv,
+          shareCode: `JTG-WORLD-${packId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`,
           author: author || (req as any).user?.username || defaultPreset.author,
           updatedAt: new Date().toISOString()
         };
@@ -3052,6 +3165,10 @@ export const updatePluginPack = async (req: Request, res: Response) => {
           picture: picture && picture.trim() ? picture.trim() : "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
           author: author || (req as any).user?.username || "Admin",
           isPreset: false,
+          isPrivate: isPriv,
+          visibility: isPriv ? "private" : "public",
+          isGlobal: !isPriv,
+          shareCode: `JTG-WORLD-${packId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`,
           plugins: Array.isArray(plugins) ? plugins : [],
           updatedAt: new Date().toISOString()
         };
@@ -3060,6 +3177,14 @@ export const updatePluginPack = async (req: Request, res: Response) => {
     }
 
     await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+
+    // Sync or remove from community packs
+    if (isPriv) {
+      await syncCommunityPack(updatedPack, true);
+    } else {
+      await syncCommunityPack(updatedPack, false);
+    }
+
     res.json({
       success: true,
       message: `Plugin pack "${updatedPack.name}" saved successfully!`,
@@ -3068,6 +3193,138 @@ export const updatePluginPack = async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("Update plugin pack error:", err);
     res.status(500).json({ error: err.message || "Failed to save plugin pack" });
+  }
+};
+
+export const togglePluginPackVisibility = async (req: Request, res: Response) => {
+  try {
+    const { packId } = req.params;
+    const { visibility } = req.body;
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    await fs.ensureFile(packsFile);
+    let customPacks: any[] = [];
+    try {
+      if (await fs.pathExists(packsFile)) {
+        customPacks = await fs.readJSON(packsFile);
+      }
+    } catch {}
+
+    let target = customPacks.find((p) => p.id === packId);
+    if (!target) {
+      // Check preset or community
+      let communityPacks: any[] = [];
+      try {
+        communityPacks = await fs.readJSON(COMMUNITY_PACKS_FILE);
+      } catch {}
+      const foundCommunity = communityPacks.find((p) => p.id === packId);
+      const foundPreset = DEFAULT_PLUGIN_PACKS.find((p) => p.id === packId);
+      if (foundCommunity || foundPreset) {
+        target = {
+          ...(foundCommunity || foundPreset),
+          isPreset: false,
+          author: (req as any).user?.username || (foundCommunity || foundPreset)?.author || "Admin"
+        };
+        customPacks.push(target);
+      } else {
+        return res.status(404).json({ error: "Plugin pack not found" });
+      }
+    }
+
+    const nextVisibility = visibility ? visibility : (target.visibility === "private" || target.isPrivate ? "public" : "private");
+    const isPriv = nextVisibility === "private";
+
+    target.visibility = nextVisibility;
+    target.isPrivate = isPriv;
+    target.isGlobal = !isPriv;
+    target.updatedAt = new Date().toISOString();
+
+    await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+
+    if (isPriv) {
+      await syncCommunityPack(target, true);
+    } else {
+      await syncCommunityPack(target, false);
+    }
+
+    res.json({
+      success: true,
+      message: isPriv
+        ? `Pack "${target.name}" is now Private / Chhupa Hua (Hidden from Global World).`
+        : `Pack "${target.name}" is now Public in Global World Hub!`,
+      visibility: nextVisibility,
+      pack: target
+    });
+  } catch (err: any) {
+    console.error("Toggle visibility error:", err);
+    res.status(500).json({ error: err.message || "Failed to toggle visibility" });
+  }
+};
+
+export const importPluginPack = async (req: Request, res: Response) => {
+  try {
+    const { packData, shareCode } = req.body;
+    let packToImport: any = null;
+
+    if (packData && typeof packData === "object") {
+      packToImport = packData;
+    } else if (typeof packData === "string") {
+      try {
+        packToImport = JSON.parse(packData);
+      } catch {
+        return res.status(400).json({ error: "Invalid JSON format for plugin pack." });
+      }
+    } else if (shareCode) {
+      // Find in community packs or preset
+      let communityPacks: any[] = [];
+      try {
+        communityPacks = await fs.readJSON(COMMUNITY_PACKS_FILE);
+      } catch {}
+      const match = communityPacks.find((p) => p.shareCode?.toLowerCase() === shareCode.trim().toLowerCase());
+      if (match) {
+        packToImport = match;
+      } else {
+        return res.status(404).json({ error: `No global pack found matching share code "${shareCode}".` });
+      }
+    }
+
+    if (!packToImport || !packToImport.name) {
+      return res.status(400).json({ error: "Invalid pack data. Name is required." });
+    }
+
+    const packsFile = path.join(process.cwd(), ".data", "plugin_packs.json");
+    await fs.ensureFile(packsFile);
+    let customPacks: any[] = [];
+    try {
+      customPacks = await fs.readJSON(packsFile);
+    } catch {}
+
+    const newPack = {
+      id: `pack_imported_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: packToImport.name,
+      description: packToImport.description || "",
+      picture: packToImport.picture || "https://images.unsplash.com/photo-1579202673506-ca3ce28943ef?w=600&auto=format&fit=crop&q=80",
+      author: packToImport.author || (req as any).user?.username || "Community",
+      isPreset: false,
+      isPrivate: Boolean(packToImport.isPrivate || packToImport.visibility === "private"),
+      visibility: packToImport.visibility || (packToImport.isPrivate ? "private" : "public"),
+      isGlobal: !(packToImport.isPrivate || packToImport.visibility === "private"),
+      shareCode: packToImport.shareCode || `JTG-WORLD-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      plugins: Array.isArray(packToImport.plugins) ? packToImport.plugins : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    customPacks.push(newPack);
+    await fs.writeJSON(packsFile, customPacks, { spaces: 2 });
+
+    res.json({
+      success: true,
+      message: `Plugin pack "${newPack.name}" imported successfully (${newPack.plugins.length} plugins)!`,
+      pack: newPack
+    });
+  } catch (err: any) {
+    console.error("Import pack error:", err);
+    res.status(500).json({ error: err.message || "Failed to import plugin pack" });
   }
 };
 

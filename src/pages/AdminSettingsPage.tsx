@@ -9,7 +9,8 @@ import {
   CheckCircle2, AlertCircle, Sparkles, ExternalLink, Cpu, Image, 
   Settings, ArrowLeft, Menu, X, Lock, Palette, UserPlus,
   Activity, AlertTriangle, Loader2, Save, MousePointerClick, Sliders,
-  Server, HardDrive, Terminal, Globe, Laptop, Radio, Cloud, Boxes, Network
+  Server, HardDrive, Terminal, Globe, Laptop, Radio, Cloud, Boxes, Network,
+  LayoutDashboard, ShieldAlert
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import AdminControls from '../components/AdminControls';
@@ -48,7 +49,8 @@ export default function AdminSettingsPage(): React.ReactElement {
     firebaseStorageBucket, firebaseMessagingSenderId, firebaseAppId, defaultRuntime, runtimeLocked,
     isDev, fetchSettings, setDefaultRuntime,
     playitServiceMode, playitServiceName, healthCheckIntervalMinutes,
-    restartDelaySeconds, maxRecoveryAttempts, allowRecoveryWhilePlayersOnline
+    restartDelaySeconds, maxRecoveryAttempts, allowRecoveryWhilePlayersOnline,
+    antiTamperArmed, setAntiTamperArmed, triggerGlitchLock, masterPin
   } = useSettings();
 
   // Exactly 4 consolidated top-level admin tabs
@@ -598,34 +600,14 @@ export default function AdminSettingsPage(): React.ReactElement {
            })}
     
            <div className="mt-6 pt-4 border-t border-line/40 space-y-1">
-              <p className="px-3 mb-2 font-mono text-[10px] text-faint tracking-widest uppercase">Quick Navigation</p>
+              <p className="px-3 mb-2 font-mono text-[10px] text-faint tracking-widest uppercase">Navigation</p>
               <Link 
                 to="/" 
                 onClick={() => setMobileOpen(false)}
-                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
+                className="relative flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors group overflow-hidden text-theme-300 hover:text-white bg-theme-500/15 hover:bg-theme-500/25 border border-theme-500/30 shadow-sm"
               >
-                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">OVERVIEW</span>
-              </Link>
-              <Link 
-                to="/servers" 
-                onClick={() => setMobileOpen(false)}
-                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
-              >
-                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">SERVERS</span>
-              </Link>
-              <Link 
-                to="/servers/create" 
-                onClick={() => setMobileOpen(false)}
-                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
-              >
-                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">DEPLOY SERVER</span>
-              </Link>
-              <Link 
-                to="/admin/servers" 
-                onClick={() => setMobileOpen(false)}
-                className="relative flex items-center px-3 py-2.5 rounded transition-colors group overflow-hidden hover:bg-white/[0.05]"
-              >
-                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 text-dim group-hover:text-white">FLEET MANAGEMENT</span>
+                 <LayoutDashboard size={18} className="text-theme-400 group-hover:scale-105 transition-transform shrink-0" />
+                 <span className="font-mono text-xs tracking-wider transition-colors duration-200 font-bold">BACK TO DASHBOARD</span>
               </Link>
            </div>
          </nav>
@@ -633,18 +615,41 @@ export default function AdminSettingsPage(): React.ReactElement {
     
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative bg-transparent">
-         <header className="sticky top-0 z-40 border-b border-line bg-ink backdrop-blur-md flex-shrink-0 h-16 flex items-center px-3 sm:px-6">
-            <button 
-                onClick={() => setMobileOpen(prev => !prev)}
-                className="md:hidden p-2.5 mr-3 bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border border-theme-500/30 text-theme-300 hover:text-white rounded-xl transition-all flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
-                title="Open All Options Menu"
-                aria-label="Open Navigation Menu"
-            >
-                <Menu className="w-5 h-5 text-theme-400" />
-            </button>
-            <h1 className="font-display font-bold text-xl uppercase text-white tracking-wide">
-               {adminTabs.find(t => t.id === activeTab)?.label}
-            </h1>
+         <header className="sticky top-0 z-40 border-b border-line bg-ink backdrop-blur-md flex-shrink-0 h-16 flex items-center justify-between px-3 sm:px-6">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <button 
+                  onClick={() => setMobileOpen(prev => !prev)}
+                  className="md:hidden p-2.5 bg-theme-500/10 hover:bg-theme-500/20 active:bg-theme-500/30 border border-theme-500/30 text-theme-300 hover:text-white rounded-xl transition-all flex items-center justify-center shrink-0 active:scale-95 cursor-pointer"
+                  title="Open All Options Menu"
+                  aria-label="Open Navigation Menu"
+              >
+                  <Menu className="w-5 h-5 text-theme-400" />
+              </button>
+              <Link 
+                to="/" 
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-theme-500/10 hover:bg-theme-500/20 border border-theme-500/30 text-xs font-mono text-theme-300 hover:text-white transition-all shadow-sm group shrink-0"
+                title="Return to Dashboard"
+              >
+                <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+                <span className="hidden sm:inline font-bold">BACK TO DASHBOARD</span>
+                <span className="sm:hidden font-bold">DASHBOARD</span>
+              </Link>
+              <h1 className="font-display font-bold text-lg sm:text-xl uppercase text-white tracking-wide truncate">
+                 {adminTabs.find(t => t.id === activeTab)?.label}
+              </h1>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => triggerGlitchLock("Owner manual security lock activated.")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/15 hover:bg-red-500/25 active:bg-red-500/35 border border-red-500/40 text-xs font-mono text-red-300 hover:text-white transition-all shadow-sm group shrink-0 cursor-pointer"
+                  title="Lock panel immediately with Glitch Mode (Owner PIN 7588 required to unlock)"
+                >
+                  <ShieldAlert size={14} className="text-red-400 group-hover:scale-110 transition-transform" />
+                  <span className="hidden sm:inline font-bold">LOCK PANEL (PIN: 7588)</span>
+                  <span className="sm:hidden font-bold">LOCK (7588)</span>
+                </button>
+              </div>
+            </div>
          </header>
     
          <main className="flex-1 w-full h-full relative z-0 overflow-x-hidden overflow-y-auto pb-safe custom-scrollbar p-4 sm:p-6 md:p-8">
@@ -1788,6 +1793,86 @@ export default function AdminSettingsPage(): React.ReactElement {
                   {/* ========================================================================= */}
                   {activeTab === "system" && (
                     <div className="space-y-8">
+                      {/* Anti-Tamper & Security Lock Defense (PIN: 7588) */}
+                      <section className="bg-card border-2 border-red-500/40 rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-border-subtle pb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+                              <ShieldAlert size={22} />
+                            </div>
+                            <div>
+                              <h2 className="text-xl font-bold flex items-center gap-2 text-foreground font-display uppercase tracking-wide">
+                                Anti-Tamper & Panel Lock Defense
+                              </h2>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Owner Master PIN Protection (<span className="font-mono text-red-400 font-bold">7588</span>). Freezes & glitches panel on unauthorized modification attempts.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 rounded-full text-[11px] font-mono font-bold bg-red-500/10 text-red-400 border border-red-500/30 flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                              {antiTamperArmed ? "ARMED & ACTIVE" : "DISARMED"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                          <div className="p-4 rounded-xl bg-muted/40 border border-border">
+                            <div className="text-xs font-bold text-foreground mb-1 flex items-center gap-2">
+                              <Key size={14} className="text-red-400" />
+                              Owner Master Security PIN
+                            </div>
+                            <div className="text-3xl font-mono font-black text-red-400 tracking-widest mt-2">
+                              7588
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                              Is PIN ke baghair koi bhi person panel ko modify ya unlock nahi kar sakta. Agar koi unauthorized change karega to panel glitch ho kar freeze ho jayega.
+                            </p>
+                          </div>
+
+                          <div className="p-4 rounded-xl bg-muted/40 border border-border flex flex-col justify-between">
+                            <div>
+                              <div className="text-xs font-bold text-foreground mb-1 flex items-center gap-2">
+                                <Shield size={14} className="text-red-400" />
+                                Anti-Tamper Defense Status
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                When armed, unauthorized attempts to edit panel branding or system configurations will automatically freeze the panel in Glitch Lockout mode.
+                              </p>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between pt-2 border-t border-border/40">
+                              <span className="text-xs font-mono text-muted-foreground">Auto-Lock Protection:</span>
+                              <button
+                                type="button"
+                                onClick={() => setAntiTamperArmed(!antiTamperArmed)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                                  antiTamperArmed
+                                    ? "bg-red-500/20 text-red-300 border border-red-500/40 hover:bg-red-500/30"
+                                    : "bg-muted text-muted-foreground border border-border hover:text-foreground"
+                                }`}
+                              >
+                                {antiTamperArmed ? "ARMED (ENABLED)" : "DISARMED"}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => triggerGlitchLock("Owner manual security lock test initiated.")}
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-mono text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+                          >
+                            <Lock size={15} />
+                            <span>Test Security Glitch Lock Now (PIN: 7588)</span>
+                          </button>
+                          <span className="text-xs text-muted-foreground">
+                            Click to test the lockdown screen. To unlock, enter <strong>7588</strong>.
+                          </span>
+                        </div>
+                      </section>
+
                       {/* Auto-Detection & Diagnostics Section (Above Update Panel) */}
                       <SystemAutoDetection />
 

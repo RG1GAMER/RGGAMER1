@@ -37,6 +37,59 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   const [maxRecoveryAttempts, setMaxRecoveryAttempts] = useState<number>(3);
   const [allowRecoveryWhilePlayersOnline, setAllowRecoveryWhilePlayersOnline] = useState<boolean>(false);
 
+  // Anti-Tamper & Security Glitch Lock State (Owner PIN: 7588)
+  const masterPin = "7588";
+  const [isGlitchLocked, setIsGlitchLocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("jtg_glitch_locked") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [glitchReason, setGlitchReason] = useState<string>(() => {
+    try {
+      return localStorage.getItem("jtg_glitch_reason") || "Unauthorized modification attempt detected without owner permission.";
+    } catch {
+      return "Unauthorized modification attempt detected without owner permission.";
+    }
+  });
+  const [antiTamperArmed, setAntiTamperArmedState] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("jtg_anti_tamper_armed") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  const setAntiTamperArmed = useCallback((armed: boolean) => {
+    setAntiTamperArmedState(armed);
+    try {
+      localStorage.setItem("jtg_anti_tamper_armed", armed ? "true" : "false");
+    } catch {}
+  }, []);
+
+  const triggerGlitchLock = useCallback((reason?: string) => {
+    const defaultReason = reason || "Unauthorized panel modification attempt detected without owner permission.";
+    setIsGlitchLocked(true);
+    setGlitchReason(defaultReason);
+    try {
+      localStorage.setItem("jtg_glitch_locked", "true");
+      localStorage.setItem("jtg_glitch_reason", defaultReason);
+    } catch {}
+  }, []);
+
+  const unlockGlitchLock = useCallback((enteredPin: string) => {
+    if (enteredPin && enteredPin.trim() === masterPin) {
+      setIsGlitchLocked(false);
+      try {
+        localStorage.removeItem("jtg_glitch_locked");
+        localStorage.removeItem("jtg_glitch_reason");
+      } catch {}
+      return true;
+    }
+    return false;
+  }, []);
+
   const setTheme = useCallback((val: string, syncToServer = false) => {
     const finalVal = val || "red";
     setThemeState(finalVal);
@@ -209,6 +262,15 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
       restartDelaySeconds, setRestartDelaySeconds,
       maxRecoveryAttempts, setMaxRecoveryAttempts,
       allowRecoveryWhilePlayersOnline, setAllowRecoveryWhilePlayersOnline,
+      // Anti-Tamper & Security Glitch Lock (PIN 7588)
+      masterPin,
+      isGlitchLocked,
+      setIsGlitchLocked,
+      glitchReason,
+      antiTamperArmed,
+      setAntiTamperArmed,
+      triggerGlitchLock,
+      unlockGlitchLock,
       fetchSettings 
     }}>
       {children}

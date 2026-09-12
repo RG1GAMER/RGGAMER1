@@ -634,7 +634,7 @@ export default function CreateServer() {
               </button>
             </div>
 
-            <a href="#" onClick={(e) => { e.preventDefault(); navigate('/servers'); }} className="flex items-center gap-3 group">
+            <a href="#" onClick={(e) => { e.preventDefault(); navigate('/'); }} className="flex items-center gap-3 group">
               {panelLogo ? (
                 <img src={panelLogo} alt={pName} className="w-7 h-7 object-contain rounded" />
               ) : (

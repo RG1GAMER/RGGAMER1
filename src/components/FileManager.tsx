@@ -5,7 +5,8 @@ import axios from "axios";
 import { 
   Folder, File, ArrowLeft, Upload, Trash2, Edit2, Save, Archive, Search, X, 
   CheckSquare, Square, Download, FilePlus, FolderPlus, MoreVertical, FileText, 
-  FileArchive, FileCode, Check, AlertTriangle, ChevronRight, FolderDown, RefreshCw
+  FileArchive, FileCode, Check, AlertTriangle, ChevronRight, FolderDown, RefreshCw,
+  Globe, Sparkles, Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,6 +37,8 @@ export default function FileManager({ serverId }: { serverId: string }) {
   const [isZipping, setIsZipping] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImportingWorld, setIsImportingWorld] = useState(false);
+  const [importStatusMessage, setImportStatusMessage] = useState("");
 
   // Active Menu row
   const [openMenuRow, setOpenMenuRow] = useState<string | null>(null);
@@ -357,6 +360,28 @@ export default function FileManager({ serverId }: { serverId: string }) {
       showToast(errorMsg, "error");
     } finally {
       setIsUnzipping(false);
+    }
+  };
+
+  // 8. Auto-Import World Archive (No coding required)
+  const handleAutoImportWorld = async (fileName: string) => {
+    setIsImportingWorld(true);
+    setOpenMenuRow(null);
+    setImportStatusMessage(`Auto-detecting and importing world from '${fileName}'...`);
+    try {
+      const fullRelativePath = path.endsWith("/") ? path + fileName : path + "/" + fileName;
+      const res = await axios.post(`/api/servers/${serverId}/world/auto-import`, {
+        filePath: fullRelativePath,
+        autoUpdateProperties: true,
+        autoStopServer: true
+      });
+      showToast(res.data?.message || `World '${res.data?.worldFolder || "world"}' imported successfully!`, "success");
+      fetchFiles();
+    } catch (err: any) {
+      showToast(err.response?.data?.error || err.message || "Failed to auto-import world", "error");
+    } finally {
+      setIsImportingWorld(false);
+      setImportStatusMessage("");
     }
   };
 
@@ -714,14 +739,23 @@ export default function FileManager({ serverId }: { serverId: string }) {
                                 <span>Compress to .ZIP</span>
                               </button>
 
-                              {/\.(zip|tar|gz|tgz|rar|7z|jar)$/i.test(f.name) && (
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUnzipItem(f.name); }}
-                                  className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-200 hover:bg-amber-600/20 hover:text-amber-300 flex items-center gap-2.5 transition-colors"
-                                >
-                                  <FolderDown size={14} className="text-theme-500" />
-                                  <span>Extract Archive</span>
-                                </button>
+                              {/\.(zip|tar|gz|tgz|rar|7z|jar|mcworld)$/i.test(f.name) && (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleAutoImportWorld(f.name); }}
+                                    className="w-full text-left px-3.5 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-600/20 hover:text-emerald-300 flex items-center gap-2.5 transition-colors"
+                                  >
+                                    <Globe size={14} className="text-emerald-400" />
+                                    <span>⚡ Auto-Import as World</span>
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleUnzipItem(f.name); }}
+                                    className="w-full text-left px-3.5 py-2 text-xs font-medium text-slate-200 hover:bg-amber-600/20 hover:text-amber-300 flex items-center gap-2.5 transition-colors"
+                                  >
+                                    <FolderDown size={14} className="text-theme-500" />
+                                    <span>Extract Archive</span>
+                                  </button>
+                                </>
                               )}
 
 
@@ -1027,6 +1061,7 @@ export default function FileManager({ serverId }: { serverId: string }) {
       {isZipping && <LoadingOverlay message="Creating Archive..." subMessage="Compressing selected files into ZIP archive..." />}
       {isDeleting && <LoadingOverlay message="Deleting Files..." subMessage="Permanently removing selected items from filesystem..." />}
       {isSaving && <LoadingOverlay message="Saving File Content..." subMessage="Writing changes to disk..." />}
+      {isImportingWorld && <LoadingOverlay message="Auto-Importing World..." subMessage={importStatusMessage || "Scanning chunks, level.dat, and configuring server.properties..."} />}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { UploadProvider } from "./context/UploadContext";
 import { GlobalBackground } from "./components/GlobalBackground";
 import { SystemUpdateListener } from "./components/SystemUpdateListener";
 import { TutorialOverlay } from "./components/TutorialOverlay";
+import { GlitchSecurityLock } from "./components/GlitchSecurityLock";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -129,6 +130,7 @@ const TutorialManager = () => {
 export default function App() {
   return (
     <SettingsProvider>
+      <GlitchSecurityLock />
       <AuthProvider>
         <SystemUpdateListener />
         <UploadProvider>

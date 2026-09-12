@@ -20,7 +20,7 @@ export function Sidebar({
   const { panelName, panelLogo } = useSettings();
   
   const links = [
-    { name: "Overview", path: "/", icon: <LayoutDashboard size={20} /> },
+    { name: "Dashboard", path: "/", icon: <LayoutDashboard size={20} /> },
     { name: "Servers", path: "/servers", icon: <Server size={20} /> },
   ];
   
